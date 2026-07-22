@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 import type { Client } from '@/types/database'
 import { useCompany } from '@/context/CompanyContext'
 
@@ -10,15 +10,7 @@ export function useClients() {
   return useQuery({
     queryKey: ['clients', companyId],
     enabled: !!companyId,
-    queryFn: async (): Promise<Client[]> => {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('name')
-      if (error) throw error
-      return data
-    },
+    queryFn: () => api.get<Client[]>(`/api/companies/${companyId}/clients`),
   })
 }
 
@@ -36,11 +28,7 @@ export function useCreateClient() {
   return useMutation({
     mutationFn: async (input: ClientInput) => {
       if (!activeCompany) throw new Error('No active company')
-      const { error } = await supabase.from('clients').insert({
-        company_id: activeCompany.id,
-        ...input,
-      })
-      if (error) throw error
+      return api.post<Client>(`/api/companies/${activeCompany.id}/clients`, input)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients', activeCompany?.id] })
@@ -54,8 +42,8 @@ export function useUpdateClient() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: ClientInput & { id: string }) => {
-      const { error } = await supabase.from('clients').update(input).eq('id', id)
-      if (error) throw error
+      if (!activeCompany) throw new Error('No active company')
+      return api.put<Client>(`/api/companies/${activeCompany.id}/clients/${id}`, input)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients', activeCompany?.id] })
@@ -69,8 +57,8 @@ export function useDeleteClient() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('clients').delete().eq('id', id)
-      if (error) throw error
+      if (!activeCompany) throw new Error('No active company')
+      await api.delete(`/api/companies/${activeCompany.id}/clients/${id}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients', activeCompany?.id] })

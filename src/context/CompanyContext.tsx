@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
+import { api, ApiError } from '@/lib/api'
 import type { Company } from '@/types/database'
 import { useAuth } from '@/context/AuthContext'
 
@@ -32,15 +32,20 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       return
     }
     setLoading(true)
-    const { data, error } = await supabase.from('companies').select('*').order('created_at')
-    if (!error && data) {
+    try {
+      const data = await api.get<Company[]>('/api/companies')
       setCompanies(data)
-      if (!activeCompanyId && data.length > 0) {
-        setActiveCompanyIdState(data[0].id)
-        localStorage.setItem(ACTIVE_COMPANY_KEY, data[0].id)
-      }
+      setActiveCompanyIdState((current) => {
+        if (current && data.some((c) => c.id === current)) return current
+        if (data.length > 0) {
+          localStorage.setItem(ACTIVE_COMPANY_KEY, data[0].id)
+          return data[0].id
+        }
+        return current
+      })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
@@ -54,23 +59,24 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   }
 
   async function createCompany(name: string, currency: string) {
-    if (!user) return { error: 'Not signed in' }
-    const { data, error } = await supabase
-      .from('companies')
-      .insert({ name, currency, created_by: user.id })
-      .select()
-      .single()
-    if (error) return { error: error.message }
-    await refresh()
-    if (data) setActiveCompanyId(data.id)
-    return { error: null }
+    try {
+      const company = await api.post<Company>('/api/companies', { name, currency })
+      await refresh()
+      setActiveCompanyId(company.id)
+      return { error: null }
+    } catch (err) {
+      return { error: err instanceof ApiError ? err.message : 'Failed to create company' }
+    }
   }
 
   async function updateCompany(id: string, patch: { name?: string; currency?: string }) {
-    const { error } = await supabase.from('companies').update(patch).eq('id', id)
-    if (error) return { error: error.message }
-    await refresh()
-    return { error: null }
+    try {
+      await api.patch(`/api/companies/${id}`, patch)
+      await refresh()
+      return { error: null }
+    } catch (err) {
+      return { error: err instanceof ApiError ? err.message : 'Failed to update company' }
+    }
   }
 
   const activeCompany = companies.find((c) => c.id === activeCompanyId) ?? null

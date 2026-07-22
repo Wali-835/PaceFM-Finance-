@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 import type { Invoice, InvoiceItem, InvoiceStatus } from '@/types/database'
 import { useCompany } from '@/context/CompanyContext'
 
@@ -17,40 +17,21 @@ export function useInvoices() {
   return useQuery({
     queryKey: ['invoices', companyId],
     enabled: !!companyId,
-    queryFn: async (): Promise<InvoiceWithTotals[]> => {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*, clients(name), invoice_totals(subtotal, tax_amount, total)')
-        .eq('company_id', companyId!)
-        .order('issue_date', { ascending: false })
-      if (error) throw error
-      return (data as unknown as Array<Invoice & {
-        clients: { name: string } | null
-        invoice_totals: { subtotal: number; tax_amount: number; total: number } | null
-      }>).map((row) => ({
-        ...row,
-        client_name: row.clients?.name ?? null,
-        subtotal: row.invoice_totals?.subtotal ?? 0,
-        tax_amount: row.invoice_totals?.tax_amount ?? 0,
-        total: row.invoice_totals?.total ?? 0,
-      }))
-    },
+    queryFn: () => api.get<InvoiceWithTotals[]>(`/api/companies/${companyId}/invoices`),
   })
 }
 
 export function useInvoice(id: string | undefined) {
+  const { activeCompany } = useCompany()
+  const companyId = activeCompany?.id
+
   return useQuery({
     queryKey: ['invoice', id],
-    enabled: !!id,
-    queryFn: async (): Promise<{ invoice: Invoice; items: InvoiceItem[] }> => {
-      const [invoiceRes, itemsRes] = await Promise.all([
-        supabase.from('invoices').select('*').eq('id', id!).single(),
-        supabase.from('invoice_items').select('*').eq('invoice_id', id!).order('position'),
-      ])
-      if (invoiceRes.error) throw invoiceRes.error
-      if (itemsRes.error) throw itemsRes.error
-      return { invoice: invoiceRes.data, items: itemsRes.data }
-    },
+    enabled: !!id && !!companyId,
+    queryFn: () =>
+      api.get<{ invoice: InvoiceWithTotals; items: InvoiceItem[] }>(
+        `/api/companies/${companyId}/invoices/${id}`,
+      ),
   })
 }
 
@@ -78,21 +59,7 @@ export function useCreateInvoice() {
   return useMutation({
     mutationFn: async (input: InvoiceInput) => {
       if (!activeCompany) throw new Error('No active company')
-      const { items, ...invoiceFields } = input
-      const { data: invoice, error } = await supabase
-        .from('invoices')
-        .insert({ company_id: activeCompany.id, ...invoiceFields })
-        .select()
-        .single()
-      if (error) throw error
-
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase.from('invoice_items').insert(
-          items.map((item, position) => ({ ...item, invoice_id: invoice.id, position })),
-        )
-        if (itemsError) throw itemsError
-      }
-      return invoice
+      return api.post<Invoice>(`/api/companies/${activeCompany.id}/invoices`, input)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] })
@@ -106,22 +73,8 @@ export function useUpdateInvoice() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: InvoiceInput & { id: string }) => {
-      const { items, ...invoiceFields } = input
-      const { error } = await supabase.from('invoices').update(invoiceFields).eq('id', id)
-      if (error) throw error
-
-      const { error: deleteError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', id)
-      if (deleteError) throw deleteError
-
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase.from('invoice_items').insert(
-          items.map((item, position) => ({ ...item, invoice_id: id, position })),
-        )
-        if (itemsError) throw itemsError
-      }
+      if (!activeCompany) throw new Error('No active company')
+      return api.put<Invoice>(`/api/companies/${activeCompany.id}/invoices/${id}`, input)
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] })
@@ -136,8 +89,8 @@ export function useUpdateInvoiceStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
-      const { error } = await supabase.from('invoices').update({ status }).eq('id', id)
-      if (error) throw error
+      if (!activeCompany) throw new Error('No active company')
+      return api.patch<Invoice>(`/api/companies/${activeCompany.id}/invoices/${id}/status`, { status })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] })
@@ -151,8 +104,8 @@ export function useDeleteInvoice() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('invoices').delete().eq('id', id)
-      if (error) throw error
+      if (!activeCompany) throw new Error('No active company')
+      await api.delete(`/api/companies/${activeCompany.id}/invoices/${id}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] })

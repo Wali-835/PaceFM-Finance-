@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  owner
+  admin
+  member
+}
+
+enum AccountType {
+  cash
+  bank
+  credit_card
+  other
+}
+
+enum CategoryKind {
+  income
+  expense
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+  void
+}
+
+model User {
+  id               String          @id @default(uuid())
+  email            String          @unique
+  passwordHash     String
+  createdAt        DateTime        @default(now())
+  memberships      CompanyMember[]
+  createdCompanies Company[]       @relation("CompanyCreator")
+  transactions     Transaction[]
+}
+
+model Company {
+  id           String          @id @default(uuid())
+  name         String
+  currency     String          @default("USD")
+  createdBy    String
+  creator      User            @relation("CompanyCreator", fields: [createdBy], references: [id])
+  createdAt    DateTime        @default(now())
+  members      CompanyMember[]
+  accounts     Account[]
+  categories   Category[]
+  transactions Transaction[]
+  budgets      Budget[]
+  clients      Client[]
+  invoices     Invoice[]
+}
+
+model CompanyMember {
+  companyId String
+  userId    String
+  role      MemberRole @default(member)
+  createdAt DateTime   @default(now())
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, userId])
+}
+
+model Account {
+  id             String        @id @default(uuid())
+  companyId      String
+  name           String
+  type           AccountType   @default(bank)
+  openingBalance Decimal       @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime      @default(now())
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+}
+
+model Category {
+  id        String        @id @default(uuid())
+  companyId String
+  name      String
+  kind      CategoryKind
+  color     String        @default("#6366f1")
+  createdAt DateTime      @default(now())
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets   Budget[]
+
+  @@unique([companyId, name, kind])
+}
+
+model Transaction {
+  id          String       @id @default(uuid())
+  companyId   String
+  accountId   String?
+  categoryId  String?
+  kind        CategoryKind
+  amount      Decimal      @db.Decimal(14, 2)
+  occurredOn  DateTime     @db.Date
+  description String       @default("")
+  createdBy   String?
+  createdAt   DateTime     @default(now())
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account     Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  creator     User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([companyId, occurredOn])
+}
+
+model Budget {
+  id         String   @id @default(uuid())
+  companyId  String
+  categoryId String
+  month      DateTime @db.Date
+  amount     Decimal  @db.Decimal(14, 2)
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, categoryId, month])
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  companyId String
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime  @default(now())
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices  Invoice[]
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  companyId     String
+  clientId      String?
+  invoiceNumber String
+  status        InvoiceStatus @default(draft)
+  issueDate     DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  notes         String        @default("")
+  taxRate       Decimal       @default(0) @db.Decimal(5, 2)
+  createdAt     DateTime      @default(now())
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client        Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  items         InvoiceItem[]
+
+  @@unique([companyId, invoiceNumber])
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal @default(0) @db.Decimal(14, 2)
+  position    Int     @default(0)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}

@@ -4,14 +4,13 @@ import { useAuth } from '@/context/AuthContext'
 import { Button, Input, Label } from '@/components/ui'
 
 export default function Signup() {
-  const { session, signUp } = useAuth()
+  const { user, signUp } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
 
-  if (session) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -20,7 +19,6 @@ export default function Signup() {
     const { error } = await signUp(email, password)
     setLoading(false)
     if (error) setError(error)
-    else setDone(true)
   }
 
   return (
@@ -30,31 +28,20 @@ export default function Signup() {
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">PaceFM Finance</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Create your workspace</p>
         </div>
-        {done ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              Check your inbox to confirm your email, then sign in.
-            </p>
-            <Link to="/login" className="mt-4 inline-block text-sm font-medium text-brand-600 hover:underline">
-              Back to sign in
-            </Link>
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" />
-            </div>
-            {error && <p className="text-sm text-negative-500">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account…' : 'Create account'}
-            </Button>
-          </form>
-        )}
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" />
+          </div>
+          {error && <p className="text-sm text-negative-500">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? 'Creating account…' : 'Create account'}
+          </Button>
+        </form>
         <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
           Already have an account?{' '}
           <Link to="/login" className="font-medium text-brand-600 hover:underline">

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 import type { Account, AccountType } from '@/types/database'
 import { useCompany } from '@/context/CompanyContext'
 
@@ -10,15 +10,7 @@ export function useAccounts() {
   return useQuery({
     queryKey: ['accounts', companyId],
     enabled: !!companyId,
-    queryFn: async (): Promise<Account[]> => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('company_id', companyId!)
-        .order('name')
-      if (error) throw error
-      return data
-    },
+    queryFn: () => api.get<Account[]>(`/api/companies/${companyId}/accounts`),
   })
 }
 
@@ -29,11 +21,7 @@ export function useCreateAccount() {
   return useMutation({
     mutationFn: async (input: { name: string; type: AccountType; opening_balance: number }) => {
       if (!activeCompany) throw new Error('No active company')
-      const { error } = await supabase.from('accounts').insert({
-        company_id: activeCompany.id,
-        ...input,
-      })
-      if (error) throw error
+      return api.post<Account>(`/api/companies/${activeCompany.id}/accounts`, input)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts', activeCompany?.id] })

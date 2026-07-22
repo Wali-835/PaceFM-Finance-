@@ -11,13 +11,6 @@ export type Company = {
   created_at: string
 }
 
-export type CompanyMember = {
-  company_id: string
-  user_id: string
-  role: MemberRole
-  created_at: string
-}
-
 export type Account = {
   id: string
   company_id: string
@@ -88,38 +81,4 @@ export type InvoiceItem = {
   quantity: number
   unit_price: number
   position: number
-}
-
-export type InvoiceTotals = {
-  invoice_id: string
-  subtotal: number
-  tax_amount: number
-  total: number
-}
-
-type Table<T> = {
-  Row: T
-  Insert: Partial<T> & Record<string, unknown>
-  Update: Partial<T>
-  Relationships: []
-}
-
-export type Database = {
-  public: {
-    Tables: {
-      companies: Table<Company>
-      company_members: Table<CompanyMember>
-      accounts: Table<Account>
-      categories: Table<Category>
-      transactions: Table<Transaction>
-      budgets: Table<Budget>
-      clients: Table<Client>
-      invoices: Table<Invoice>
-      invoice_items: Table<InvoiceItem>
-    }
-    Views: {
-      invoice_totals: { Row: InvoiceTotals; Relationships: [] }
-    }
-    Functions: Record<string, never>
-  }
 }

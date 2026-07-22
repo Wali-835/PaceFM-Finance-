@@ -28,9 +28,9 @@ function FullScreenLoader() {
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { session, loading } = useAuth()
+  const { user, loading } = useAuth()
   if (loading) return <FullScreenLoader />
-  if (!session) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 

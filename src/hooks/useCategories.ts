@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 import type { Category, CategoryKind } from '@/types/database'
 import { useCompany } from '@/context/CompanyContext'
 
@@ -10,12 +10,9 @@ export function useCategories(kind?: CategoryKind) {
   return useQuery({
     queryKey: ['categories', companyId, kind],
     enabled: !!companyId,
-    queryFn: async (): Promise<Category[]> => {
-      let query = supabase.from('categories').select('*').eq('company_id', companyId!)
-      if (kind) query = query.eq('kind', kind)
-      const { data, error } = await query.order('name')
-      if (error) throw error
-      return data
+    queryFn: () => {
+      const query = kind ? `?kind=${kind}` : ''
+      return api.get<Category[]>(`/api/companies/${companyId}/categories${query}`)
     },
   })
 }
@@ -27,11 +24,7 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: async (input: { name: string; kind: CategoryKind; color: string }) => {
       if (!activeCompany) throw new Error('No active company')
-      const { error } = await supabase.from('categories').insert({
-        company_id: activeCompany.id,
-        ...input,
-      })
-      if (error) throw error
+      return api.post<Category>(`/api/companies/${activeCompany.id}/categories`, input)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories', activeCompany?.id] })
@@ -45,8 +38,8 @@ export function useDeleteCategory() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('categories').delete().eq('id', id)
-      if (error) throw error
+      if (!activeCompany) throw new Error('No active company')
+      await api.delete(`/api/companies/${activeCompany.id}/categories/${id}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories', activeCompany?.id] })
