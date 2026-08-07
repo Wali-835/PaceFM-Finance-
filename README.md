@@ -17,8 +17,9 @@ and invoices, with a dashboard and reports.
 - PostgreSQL via Prisma
 - JWT auth in an httpOnly cookie (bcrypt-hashed passwords)
 
-This is a fully self-hosted stack — no third-party backend-as-a-service. You
-run your own Postgres database and your own API server.
+The API server is self-hosted (you run it), but the database can be any
+Postgres — including a free hosted one like [Neon](https://neon.tech), which
+means no local Postgres install is required.
 
 ## Features
 
@@ -38,31 +39,38 @@ run your own Postgres database and your own API server.
 
 ## Getting started
 
-### 1. Set up PostgreSQL
+### 1. Create a Neon Postgres database
 
-Install PostgreSQL locally (or point at any Postgres instance you have —
-Docker, a managed DB, etc). On Debian/Ubuntu:
+1. Sign up at [neon.tech](https://neon.tech) (free tier, no credit card).
+2. Create a project — this gives you a database automatically (default name
+   `neondb`; you can rename it or create a new one called `pacefm_finance`
+   from the Neon dashboard's SQL editor: `CREATE DATABASE pacefm_finance;`).
+3. In the dashboard, open **Connection Details** and copy the connection
+   string. Use the **direct** (non-pooled) connection — the pooled one has
+   `-pooler` in the hostname; avoid that one for now to keep things simple.
+   It looks like:
+   `postgresql://user:password@ep-xxxx.region.aws.neon.tech/pacefm_finance?sslmode=require`
 
-```bash
-sudo apt install postgresql
-sudo service postgresql start
-sudo -u postgres psql -c "CREATE ROLE pacefm LOGIN PASSWORD 'pacefm' CREATEDB;"
-sudo -u postgres psql -c "CREATE DATABASE pacefm_finance OWNER pacefm;"
-```
-
-(`CREATEDB` is needed so Prisma Migrate can create its shadow database in
-dev. If you don't want to grant that, run migrations with `prisma migrate
-deploy` instead of `migrate dev`.)
+No local Postgres install is needed — Prisma only needs network access to
+this connection string, so this works fine even on an older machine that
+can't run a modern Postgres server locally.
 
 ### 2. Configure and start the server
 
 ```bash
 cd server
-cp .env.example .env   # edit DATABASE_URL / JWT_SECRET if needed
+cp .env.example .env    # paste your Neon connection string into DATABASE_URL
 npm install
-npm run prisma:migrate # creates tables
-npm run dev             # starts the API on http://localhost:4000
+npm run prisma:deploy   # applies the existing migration to your database
+npm run dev              # starts the API on http://localhost:4000
 ```
+
+(`prisma:deploy` runs `prisma migrate deploy`, which applies the migration
+already committed in `server/prisma/migrations/` — no shadow database
+needed. Only use `npm run prisma:migrate` — `prisma migrate dev` — later,
+when you're changing the schema yourself; that one does need a shadow
+database, which Neon can provide via a second database or branch if you get
+there.)
 
 ### 3. Configure and start the client
 
