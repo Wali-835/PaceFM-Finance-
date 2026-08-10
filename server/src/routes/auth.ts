@@ -12,10 +12,20 @@ const credentialsSchema = z.object({
   password: z.string().min(6),
 })
 
+const isProduction = process.env.NODE_ENV === 'production'
+
+// In production the API and the frontend are on different domains
+// (e.g. onrender.com vs pages.dev), so the cookie must be SameSite=None to
+// be sent on cross-site fetch requests. That requires Secure, which is fine
+// since both Render and Cloudflare Pages serve over HTTPS. Locally, both
+// run on localhost (different ports only), so Lax is enough and avoids
+// needing HTTPS in dev.
+const sameSite: 'none' | 'lax' = isProduction ? 'none' : 'lax'
+
 const cookieOptions = {
   httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  sameSite,
+  secure: isProduction,
   maxAge: AUTH_COOKIE_MAX_AGE_MS,
   path: '/',
 }
@@ -68,7 +78,7 @@ authRouter.post(
 )
 
 authRouter.post('/logout', (_req, res) => {
-  res.clearCookie(AUTH_COOKIE_NAME, { path: '/' })
+  res.clearCookie(AUTH_COOKIE_NAME, { path: '/', sameSite: cookieOptions.sameSite, secure: cookieOptions.secure })
   res.status(204).end()
 })
 
