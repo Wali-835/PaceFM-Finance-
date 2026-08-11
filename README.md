@@ -17,9 +17,11 @@ and invoices, with a dashboard and reports.
 - PostgreSQL via Prisma
 - JWT auth in an httpOnly cookie (bcrypt-hashed passwords)
 
-The API server is self-hosted (you run it), but the database can be any
-Postgres — including a free hosted one like [Neon](https://neon.tech), which
-means no local Postgres install is required.
+The API can run either as a normal persistent Node process (local dev, or
+any traditional host) or as Vercel serverless functions (see "Deploying"
+below) — same Express app either way. The database is Postgres, and can be
+a free hosted instance like [Neon](https://neon.tech), so no local install
+of anything beyond Node is required.
 
 ## Features
 
@@ -40,62 +42,63 @@ means no local Postgres install is required.
 ## Deploying (no local machine required)
 
 The whole app can run without installing anything locally: Neon hosts the
-database, [Render](https://render.com) hosts the API, and
-[Cloudflare Pages](https://pages.cloudflare.com) hosts the frontend as a
-static site. All three have free tiers with no credit card required.
+database, and [Vercel](https://vercel.com) hosts both the frontend (as a
+static site) and the API (as serverless functions) — as two separate Vercel
+projects from the same repo. Both have free tiers with no credit card
+required.
 
-Render's free tier sleeps the API after 15 minutes of no traffic — the next
-request takes ~30–50 seconds to wake it back up. Fine for occasional/small
-team use; if that's a problem later, upgrading Render to a paid instance
-removes it.
+Serverless functions are stateless and only run while handling a request —
+there's no persistent process, so no "sleeping" like some other free
+hosts. Cold starts (the first request after a while) take a second or two,
+not tens of seconds.
 
 ### 1. Create the Neon database
 
-Follow "1. Create a Neon Postgres database" below to get a `DATABASE_URL`.
+Follow "1. Create a Neon Postgres database" below — you need both the
+pooled and direct connection strings.
 
-### 2. Deploy the API to Render
+### 2. Deploy the API to Vercel
 
-1. Sign up at [render.com](https://render.com) with GitHub.
-2. **New +** → **Web Service** → pick this repo.
+1. Sign up at [vercel.com](https://vercel.com) with GitHub.
+2. **Add New** → **Project** → import this repo.
 3. Set:
    - **Root Directory**: `server`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-   - **Instance Type**: Free
-4. Add environment variables (Render's "Environment" tab):
-   - `DATABASE_URL` — your Neon connection string
+   - Framework preset: **Other** (Vercel will detect the `api/` folder and
+     `vercel.json` automatically — no build/output settings needed)
+4. Add environment variables:
+   - `DATABASE_URL` — your Neon **pooled** connection string
+   - `DIRECT_URL` — your Neon **direct** connection string
    - `JWT_SECRET` — any long random string
    - `NODE_ENV` — `production`
-   - `CLIENT_ORIGIN` — leave a placeholder like `https://placeholder.pages.dev`
+   - `CLIENT_ORIGIN` — leave a placeholder like `https://placeholder.vercel.app`
      for now, you'll fix this in step 4
-5. Deploy. Once it's live, copy the URL Render gives you (e.g.
-   `https://pacefm-api.onrender.com`) — you'll need it next.
-   (`npm start` runs `prisma migrate deploy` automatically before starting,
-   so the database schema is applied on first deploy.)
+5. Deploy. Once it's live, copy the URL Vercel gives you (e.g.
+   `https://pacefm-api.vercel.app`) — you'll need it next.
+   (The `vercel-build` script runs `prisma generate && prisma migrate
+   deploy` automatically, so the database schema is applied on every
+   deploy.)
 
-### 3. Deploy the frontend to Cloudflare Pages
+### 3. Deploy the frontend to Vercel
 
-1. Sign up at [pages.cloudflare.com](https://pages.cloudflare.com) with
-   GitHub.
-2. **Create a project** → **Connect to Git** → pick this repo.
-3. Set:
-   - **Framework preset**: Vite
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-   - **Root directory**: `/` (the repo root — leave default)
-4. Add an environment variable: `VITE_API_URL` = the Render URL from step 2
-   (e.g. `https://pacefm-api.onrender.com`).
-5. Deploy. Copy the `*.pages.dev` URL Cloudflare gives you.
+1. **Add New** → **Project** → import this repo again (a second, separate
+   project).
+2. Set:
+   - **Root Directory**: `/` (the repo root — leave default)
+   - Framework preset: **Vite** (auto-detected)
+3. Add an environment variable: `VITE_API_URL` = the API URL from step 2
+   (e.g. `https://pacefm-api.vercel.app`).
+4. Deploy. Copy the URL Vercel gives you (e.g.
+   `https://pacefm-finance.vercel.app`).
 
 ### 4. Connect the two
 
-Go back to Render → your service → Environment, and set `CLIENT_ORIGIN` to
-the exact Cloudflare Pages URL from step 3 (e.g.
-`https://pacefm-finance.pages.dev`, no trailing slash). Save — Render
-redeploys automatically. Once that finishes, open the Cloudflare Pages URL,
-sign up, and create your company workspace.
+Go back to the **API** project → Settings → Environment Variables, and set
+`CLIENT_ORIGIN` to the exact frontend URL from step 3 (no trailing slash).
+Redeploy that project (Vercel doesn't auto-redeploy on an env var change —
+use the "Redeploy" button on the latest deployment). Once that finishes,
+open the frontend URL, sign up, and create your company workspace.
 
-Every push to this branch will auto-redeploy both services.
+Every push to this branch will auto-redeploy both projects going forward.
 
 ## Local development
 
@@ -105,21 +108,30 @@ Every push to this branch will auto-redeploy both services.
 2. Create a project — this gives you a database automatically (default name
    `neondb`; you can rename it or create a new one called `pacefm_finance`
    from the Neon dashboard's SQL editor: `CREATE DATABASE pacefm_finance;`).
-3. In the dashboard, open **Connection Details** and copy the connection
-   string. Use the **direct** (non-pooled) connection — the pooled one has
-   `-pooler` in the hostname; avoid that one for now to keep things simple.
-   It looks like:
-   `postgresql://user:password@ep-xxxx.region.aws.neon.tech/pacefm_finance?sslmode=require`
+3. In the dashboard, open **Connection Details**. You need *both* variants
+   of the connection string:
+   - **Pooled** (hostname has `-pooler` in it) → goes in `DATABASE_URL`
+   - **Direct** (no `-pooler`) → goes in `DIRECT_URL`
+
+   They look like:
+   ```
+   postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/pacefm_finance?sslmode=require
+   postgresql://user:password@ep-xxxx.region.aws.neon.tech/pacefm_finance?sslmode=require
+   ```
+   The app uses the pooled one at runtime (important once this is deployed
+   as serverless functions, which can open many concurrent connections);
+   Prisma Migrate uses the direct one, since migrations need session-level
+   features a transaction pooler doesn't support.
 
 No local Postgres install is needed — Prisma only needs network access to
-this connection string, so this works fine even on an older machine that
+these connection strings, so this works fine even on an older machine that
 can't run a modern Postgres server locally.
 
 ### 2. Configure and start the server
 
 ```bash
 cd server
-cp .env.example .env    # paste your Neon connection string into DATABASE_URL
+cp .env.example .env    # paste your Neon connection strings into DATABASE_URL / DIRECT_URL
 npm install
 npm run prisma:deploy   # applies the existing migration to your database
 npm run dev              # starts the API on http://localhost:4000
@@ -166,8 +178,22 @@ from line items in the API layer rather than stored.
 - `npm run lint` — run oxlint
 
 **Server** (`server/`)
-- `npm run dev` — start the API with hot reload
-- `npm run build` — compile TypeScript
-- `npm start` — run the compiled server
-- `npm run prisma:migrate` — create/apply a migration in dev
+- `npm run dev` — start the API with hot reload (persistent process, for
+  local development)
+- `npm run build` — compile TypeScript (used when running as a persistent
+  server, e.g. `npm start`)
+- `npm start` — run the compiled server (applies pending migrations first)
+- `npm run vercel-build` — what Vercel runs automatically on deploy
+  (generates the Prisma client and applies migrations; no compile step,
+  since Vercel's serverless builder compiles `api/index.ts` per-function)
+- `npm run prisma:deploy` — apply already-committed migrations (no shadow
+  database needed)
+- `npm run prisma:migrate` — create a new migration in dev (needs a shadow
+  database)
 - `npm run prisma:studio` — browse the database in Prisma Studio
+
+The server has two entry points: `src/index.ts` starts a normal persistent
+Express server (`npm run dev` / `npm start`) for local development or any
+traditional host. `api/index.ts` + `vercel.json` export the same Express
+app as a Vercel serverless function — every request gets rewritten to it,
+and Express's own router handles the path internally.
