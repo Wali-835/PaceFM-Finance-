@@ -39,10 +39,11 @@ function serializeBill(bill: BillWithItems) {
   }
 }
 
-function serializeItem(item: { id: string; description: string; quantity: unknown; unitPrice: unknown; position: number }) {
+function serializeItem(item: { id: string; description: string; unit: string; quantity: unknown; unitPrice: unknown; position: number }) {
   return {
     id: item.id,
     description: item.description,
+    unit: item.unit,
     quantity: Number(item.quantity),
     unit_price: Number(item.unitPrice),
     position: item.position,
@@ -81,6 +82,7 @@ billsRouter.get(
 
 const itemSchema = z.object({
   description: z.string().min(1),
+  unit: z.string().default(''),
   quantity: z.number(),
   unit_price: z.number(),
 })
@@ -120,6 +122,7 @@ billsRouter.post(
         items: {
           create: items.map((item, position) => ({
             description: item.description,
+            unit: item.unit,
             quantity: item.quantity,
             unitPrice: item.unit_price,
             position,
@@ -162,6 +165,7 @@ billsRouter.put(
           data: items.map((item, position) => ({
             billId: req.params.billId,
             description: item.description,
+            unit: item.unit,
             quantity: item.quantity,
             unitPrice: item.unit_price,
             position,

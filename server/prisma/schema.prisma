@@ -176,6 +176,7 @@ model InvoiceItem {
   id          String  @id @default(uuid())
   invoiceId   String
   description String
+  unit        String  @default("")
   quantity    Decimal @default(1) @db.Decimal(10, 2)
   unitPrice   Decimal @default(0) @db.Decimal(14, 2)
   position    Int     @default(0)
@@ -218,6 +219,7 @@ model BillItem {
   id          String  @id @default(uuid())
   billId      String
   description String
+  unit        String  @default("")
   quantity    Decimal @default(1) @db.Decimal(10, 2)
   unitPrice   Decimal @default(0) @db.Decimal(14, 2)
   position    Int     @default(0)

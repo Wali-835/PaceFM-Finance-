@@ -37,6 +37,7 @@ export function useInvoice(id: string | undefined) {
 
 export interface InvoiceItemInput {
   description: string
+  unit: string
   quantity: number
   unit_price: number
 }

@@ -36,6 +36,7 @@ export function useBill(id: string | undefined) {
 
 export interface BillItemInput {
   description: string
+  unit: string
   quantity: number
   unit_price: number
 }

@@ -22,8 +22,10 @@ function defaultDueDate() {
   return d.toISOString().slice(0, 10)
 }
 
+const UNIT_SUGGESTIONS = ['pcs', 'hrs', 'kg', 'box', 'unit', 'day', 'month']
+
 function emptyItem(): InvoiceItemInput {
-  return { description: '', quantity: 1, unit_price: 0 }
+  return { description: '', unit: '', quantity: 1, unit_price: 0 }
 }
 
 export default function InvoiceDetail() {
@@ -71,6 +73,7 @@ export default function InvoiceDetail() {
         tax_rate: loaded.invoice.tax_rate,
         items: loaded.items.map((i) => ({
           description: i.description,
+          unit: i.unit,
           quantity: i.quantity,
           unit_price: i.unit_price,
         })),
@@ -229,7 +232,8 @@ export default function InvoiceDetail() {
 
         <div className="space-y-2">
           <div className="hidden grid-cols-12 gap-2 text-xs font-medium uppercase text-slate-500 sm:grid dark:text-slate-400">
-            <span className="col-span-6">Description</span>
+            <span className="col-span-4">Description</span>
+            <span className="col-span-2">Unit</span>
             <span className="col-span-2">Qty</span>
             <span className="col-span-2">Unit price</span>
             <span className="col-span-2 text-right">Amount</span>
@@ -237,10 +241,17 @@ export default function InvoiceDetail() {
           {form.items.map((item, i) => (
             <div key={i} className="grid grid-cols-12 items-center gap-2">
               <Input
-                className="col-span-12 sm:col-span-6"
+                className="col-span-12 sm:col-span-4"
                 placeholder="Description"
                 value={item.description}
                 onChange={(e) => updateItem(i, { description: e.target.value })}
+              />
+              <Input
+                className="col-span-4 sm:col-span-2"
+                list="unit-suggestions"
+                placeholder="e.g. pcs"
+                value={item.unit}
+                onChange={(e) => updateItem(i, { unit: e.target.value })}
               />
               <Input
                 className="col-span-4 sm:col-span-2"
@@ -270,6 +281,11 @@ export default function InvoiceDetail() {
               </button>
             </div>
           ))}
+          <datalist id="unit-suggestions">
+            {UNIT_SUGGESTIONS.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
         </div>
 
         <div className="mt-6 flex justify-end">

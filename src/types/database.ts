@@ -86,6 +86,7 @@ export type InvoiceItem = {
   id: string
   invoice_id: string
   description: string
+  unit: string
   quantity: number
   unit_price: number
   position: number
@@ -119,6 +120,7 @@ export type BillItem = {
   id: string
   bill_id: string
   description: string
+  unit: string
   quantity: number
   unit_price: number
   position: number

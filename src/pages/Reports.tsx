@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
+import { useInvoices } from '@/hooks/useInvoices'
+import { useBills } from '@/hooks/useBills'
 import { useCompany } from '@/context/CompanyContext'
-import { Card, Input, Label } from '@/components/ui'
+import { Card, EmptyState, Input, Label } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 
 function startOfMonth() {
@@ -24,6 +26,8 @@ export default function Reports() {
 
   const { data: transactions = [], isLoading } = useTransactions({ from, to })
   const { data: categories = [] } = useCategories()
+  const { data: invoices = [] } = useInvoices()
+  const { data: bills = [] } = useBills()
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
   const income = transactions.filter((t) => t.kind === 'income').reduce((s, t) => s + t.total, 0)
@@ -45,6 +49,46 @@ export default function Reports() {
       }))
       .sort((a, b) => b.amount - a.amount)
   }, [transactions, categoryMap])
+
+  const byClient = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; count: number; invoiced: number; paid: number; outstanding: number }
+    >()
+    for (const inv of invoices) {
+      if (inv.issue_date < from || inv.issue_date > to) continue
+      if (inv.status === 'draft' || inv.status === 'void') continue
+      const key = inv.client_id ?? 'none'
+      const name = inv.client_name ?? 'No client'
+      const entry = map.get(key) ?? { name, count: 0, invoiced: 0, paid: 0, outstanding: 0 }
+      entry.count += 1
+      entry.invoiced += inv.total
+      if (inv.status === 'paid') entry.paid += inv.total
+      else entry.outstanding += inv.total
+      map.set(key, entry)
+    }
+    return [...map.values()].sort((a, b) => b.outstanding - a.outstanding || b.invoiced - a.invoiced)
+  }, [invoices, from, to])
+
+  const byVendor = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; count: number; billed: number; paid: number; outstanding: number }
+    >()
+    for (const bill of bills) {
+      if (bill.bill_date < from || bill.bill_date > to) continue
+      if (bill.status === 'void') continue
+      const key = bill.vendor_id ?? 'none'
+      const name = bill.vendor_name ?? 'No vendor'
+      const entry = map.get(key) ?? { name, count: 0, billed: 0, paid: 0, outstanding: 0 }
+      entry.count += 1
+      entry.billed += bill.total
+      if (bill.status === 'paid') entry.paid += bill.total
+      else entry.outstanding += bill.total
+      map.set(key, entry)
+    }
+    return [...map.values()].sort((a, b) => b.outstanding - a.outstanding || b.billed - a.billed)
+  }, [bills, from, to])
 
   return (
     <div className="space-y-6">
@@ -123,6 +167,86 @@ export default function Reports() {
               </div>
             )}
           </Card>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">By client</h2>
+              {byClient.length === 0 ? (
+                <EmptyState title="No invoices in this period" description="Issued invoices will be broken down by client here." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="py-2 pr-2">Client</th>
+                        <th className="py-2 pr-2 text-right">Invoiced</th>
+                        <th className="py-2 pr-2 text-right">Paid</th>
+                        <th className="py-2 text-right">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {byClient.map((c) => (
+                        <tr key={c.name}>
+                          <td className="py-2 pr-2 font-medium text-slate-800 dark:text-slate-200">
+                            {c.name}
+                            <span className="ml-1 text-xs font-normal text-slate-400">({c.count})</span>
+                          </td>
+                          <td className="py-2 pr-2 text-right text-slate-600 dark:text-slate-300">
+                            {formatCurrency(c.invoiced, currency)}
+                          </td>
+                          <td className="py-2 pr-2 text-right text-positive-600 dark:text-positive-500">
+                            {formatCurrency(c.paid, currency)}
+                          </td>
+                          <td className={`py-2 text-right font-medium ${c.outstanding > 0 ? 'text-negative-500' : 'text-slate-400'}`}>
+                            {formatCurrency(c.outstanding, currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">By vendor</h2>
+              {byVendor.length === 0 ? (
+                <EmptyState title="No bills in this period" description="Bills from vendors will be broken down here." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="py-2 pr-2">Vendor</th>
+                        <th className="py-2 pr-2 text-right">Billed</th>
+                        <th className="py-2 pr-2 text-right">Paid</th>
+                        <th className="py-2 text-right">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {byVendor.map((v) => (
+                        <tr key={v.name}>
+                          <td className="py-2 pr-2 font-medium text-slate-800 dark:text-slate-200">
+                            {v.name}
+                            <span className="ml-1 text-xs font-normal text-slate-400">({v.count})</span>
+                          </td>
+                          <td className="py-2 pr-2 text-right text-slate-600 dark:text-slate-300">
+                            {formatCurrency(v.billed, currency)}
+                          </td>
+                          <td className="py-2 pr-2 text-right text-positive-600 dark:text-positive-500">
+                            {formatCurrency(v.paid, currency)}
+                          </td>
+                          <td className={`py-2 text-right font-medium ${v.outstanding > 0 ? 'text-negative-500' : 'text-slate-400'}`}>
+                            {formatCurrency(v.outstanding, currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
         </>
       )}
     </div>
