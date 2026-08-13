@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
+import { useVendors } from '@/hooks/useVendors'
 import { useCompany } from '@/context/CompanyContext'
 import { Badge, Button, EmptyState, Input, Label, Modal, Select } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -17,6 +18,7 @@ import type { CategoryKind, Transaction } from '@/types/database'
 const emptyForm: TransactionInput = {
   account_id: null,
   category_id: null,
+  vendor_id: null,
   kind: 'expense',
   amount: 0,
   tax_rate: 0,
@@ -35,6 +37,7 @@ export default function Transactions() {
   })
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
+  const { data: vendors = [] } = useVendors()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
@@ -68,6 +71,7 @@ export default function Transactions() {
     setForm({
       account_id: t.account_id,
       category_id: t.category_id,
+      vendor_id: t.vendor_id,
       kind: t.kind,
       amount: t.amount,
       tax_rate: t.tax_rate,
@@ -138,6 +142,7 @@ export default function Transactions() {
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Account</th>
+                <th className="px-4 py-3">Vendor</th>
                 <th className="px-4 py-3 text-right">Amount</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -158,6 +163,9 @@ export default function Transactions() {
                   </td>
                   <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                     {t.account_id ? accountMap.get(t.account_id)?.name ?? '—' : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                    {t.vendor_name ?? '—'}
                   </td>
                   <td
                     className={`px-4 py-3 text-right font-medium ${
@@ -202,7 +210,7 @@ export default function Transactions() {
               <button
                 type="button"
                 key={k}
-                onClick={() => setForm((f) => ({ ...f, kind: k, category_id: null }))}
+                onClick={() => setForm((f) => ({ ...f, kind: k, category_id: null, vendor_id: k === 'income' ? null : f.vendor_id }))}
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
                   form.kind === k
                     ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400'
@@ -279,6 +287,24 @@ export default function Transactions() {
               ))}
             </Select>
           </div>
+
+          {form.kind === 'expense' && (
+            <div>
+              <Label htmlFor="vendor">Vendor</Label>
+              <Select
+                id="vendor"
+                value={form.vendor_id ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, vendor_id: e.target.value || null }))}
+              >
+                <option value="">No vendor</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
 
           <div>
             <button

@@ -12,6 +12,8 @@ function serializeTransaction(t: {
   companyId: string
   accountId: string | null
   categoryId: string | null
+  vendorId: string | null
+  vendor?: { name: string } | null
   kind: string
   amount: unknown
   taxRate: unknown
@@ -31,6 +33,8 @@ function serializeTransaction(t: {
     company_id: t.companyId,
     account_id: t.accountId,
     category_id: t.categoryId,
+    vendor_id: t.vendorId,
+    vendor_name: t.vendor?.name ?? null,
     kind: t.kind,
     amount,
     tax_rate: taxRate,
@@ -57,6 +61,7 @@ transactionsRouter.get(
         ...(kind === 'income' || kind === 'expense' ? { kind } : {}),
         ...(categoryId ? { categoryId } : {}),
       },
+      include: { vendor: true },
       orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
     })
     res.json(transactions.map(serializeTransaction))
@@ -66,6 +71,7 @@ transactionsRouter.get(
 const transactionSchema = z.object({
   account_id: z.string().nullable(),
   category_id: z.string().nullable(),
+  vendor_id: z.string().nullable(),
   kind: z.enum(['income', 'expense']),
   amount: z.number().positive(),
   tax_rate: z.number().default(0),
@@ -87,6 +93,7 @@ transactionsRouter.post(
         companyId: req.params.companyId,
         accountId: parsed.data.account_id,
         categoryId: parsed.data.category_id,
+        vendorId: parsed.data.vendor_id,
         kind: parsed.data.kind,
         amount: parsed.data.amount,
         taxRate: parsed.data.tax_rate,
@@ -95,6 +102,7 @@ transactionsRouter.post(
         description: parsed.data.description,
         createdBy: req.userId,
       },
+      include: { vendor: true },
     })
     res.status(201).json(serializeTransaction(t))
   }),
@@ -113,6 +121,7 @@ transactionsRouter.put(
       data: {
         accountId: parsed.data.account_id,
         categoryId: parsed.data.category_id,
+        vendorId: parsed.data.vendor_id,
         kind: parsed.data.kind,
         amount: parsed.data.amount,
         taxRate: parsed.data.tax_rate,
@@ -120,6 +129,7 @@ transactionsRouter.put(
         occurredOn: new Date(parsed.data.occurred_on),
         description: parsed.data.description,
       },
+      include: { vendor: true },
     })
     res.json(serializeTransaction(t))
   }),

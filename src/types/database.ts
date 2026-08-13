@@ -35,6 +35,8 @@ export type Transaction = {
   company_id: string
   account_id: string | null
   category_id: string | null
+  vendor_id: string | null
+  vendor_name: string | null
   kind: CategoryKind
   amount: number
   tax_rate: number

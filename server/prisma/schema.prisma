@@ -111,6 +111,7 @@ model Transaction {
   companyId   String
   accountId   String?
   categoryId  String?
+  vendorId    String?
   kind        CategoryKind
   amount      Decimal      @db.Decimal(14, 2)
   taxRate     Decimal      @default(0) @db.Decimal(5, 2)
@@ -122,6 +123,7 @@ model Transaction {
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   account     Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
   category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   creator     User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([companyId, occurredOn])
@@ -190,6 +192,7 @@ model Vendor {
   createdAt DateTime @default(now())
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   bills     Bill[]
+  transactions Transaction[]
 }
 
 model Bill {

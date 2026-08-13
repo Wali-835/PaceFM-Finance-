@@ -32,6 +32,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
 export interface TransactionInput {
   account_id: string | null
   category_id: string | null
+  vendor_id: string | null
   kind: CategoryKind
   amount: number
   tax_rate: number
