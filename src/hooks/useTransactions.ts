@@ -34,6 +34,8 @@ export interface TransactionInput {
   category_id: string | null
   kind: CategoryKind
   amount: number
+  tax_rate: number
+  wht_rate: number
   occurred_on: string
   description: string
 }

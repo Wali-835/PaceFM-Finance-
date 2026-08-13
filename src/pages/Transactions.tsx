@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Pencil, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   useCreateTransaction,
   useDeleteTransaction,
@@ -19,6 +19,8 @@ const emptyForm: TransactionInput = {
   category_id: null,
   kind: 'expense',
   amount: 0,
+  tax_rate: 0,
+  wht_rate: 0,
   occurred_on: new Date().toISOString().slice(0, 10),
   description: '',
 }
@@ -37,6 +39,7 @@ export default function Transactions() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [form, setForm] = useState<TransactionInput>(emptyForm)
+  const [showTax, setShowTax] = useState(false)
 
   const createTx = useCreateTransaction()
   const updateTx = useUpdateTransaction()
@@ -45,6 +48,14 @@ export default function Transactions() {
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
   const filteredCategories = categories.filter((c) => c.kind === form.kind)
+
+  const taxAmount = form.amount * (form.tax_rate / 100)
+  const whtAmount = form.amount * (form.wht_rate / 100)
+  const netTotal = form.amount + taxAmount - whtAmount
+
+  useEffect(() => {
+    if (!modalOpen) setShowTax(false)
+  }, [modalOpen])
 
   function openCreate() {
     setEditing(null)
@@ -59,9 +70,12 @@ export default function Transactions() {
       category_id: t.category_id,
       kind: t.kind,
       amount: t.amount,
+      tax_rate: t.tax_rate,
+      wht_rate: t.wht_rate,
       occurred_on: t.occurred_on,
       description: t.description,
     })
+    setShowTax(t.tax_rate !== 0 || t.wht_rate !== 0)
     setModalOpen(true)
   }
 
@@ -151,7 +165,12 @@ export default function Transactions() {
                     }`}
                   >
                     {t.kind === 'income' ? '+' : '-'}
-                    {formatCurrency(t.amount, currency)}
+                    {formatCurrency(t.total, currency)}
+                    {(t.tax_rate !== 0 || t.wht_rate !== 0) && (
+                      <span className="ml-1 text-xs font-normal text-slate-400">
+                        (tax {t.tax_rate}%{t.wht_rate ? `, WHT ${t.wht_rate}%` : ''})
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
@@ -259,6 +278,64 @@ export default function Transactions() {
                 </option>
               ))}
             </Select>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowTax((s) => !s)}
+              className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline"
+            >
+              {showTax ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              Tax / withholding tax (WHT)
+            </button>
+
+            {showTax && (
+              <div className="mt-3 space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="tax_rate">Tax rate (%)</Label>
+                    <Input
+                      id="tax_rate"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.tax_rate || ''}
+                      onChange={(e) => setForm((f) => ({ ...f, tax_rate: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="wht_rate">WHT rate (%)</Label>
+                    <Input
+                      id="wht_rate"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.wht_rate || ''}
+                      onChange={(e) => setForm((f) => ({ ...f, wht_rate: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>Amount</span>
+                    <span>{formatCurrency(form.amount, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax ({form.tax_rate || 0}%)</span>
+                    <span>+{formatCurrency(taxAmount, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>WHT ({form.wht_rate || 0}%)</span>
+                    <span>-{formatCurrency(whtAmount, currency)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                    <span>Net {form.kind === 'income' ? 'received' : 'paid'}</span>
+                    <span>{formatCurrency(netTotal, currency)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

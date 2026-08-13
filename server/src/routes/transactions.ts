@@ -14,18 +14,30 @@ function serializeTransaction(t: {
   categoryId: string | null
   kind: string
   amount: unknown
+  taxRate: unknown
+  whtRate: unknown
   occurredOn: Date
   description: string
   createdBy: string | null
   createdAt: Date
 }) {
+  const amount = Number(t.amount)
+  const taxRate = Number(t.taxRate)
+  const whtRate = Number(t.whtRate)
+  const taxAmount = amount * (taxRate / 100)
+  const whtAmount = amount * (whtRate / 100)
   return {
     id: t.id,
     company_id: t.companyId,
     account_id: t.accountId,
     category_id: t.categoryId,
     kind: t.kind,
-    amount: Number(t.amount),
+    amount,
+    tax_rate: taxRate,
+    wht_rate: whtRate,
+    tax_amount: taxAmount,
+    wht_amount: whtAmount,
+    total: amount + taxAmount - whtAmount,
     occurred_on: t.occurredOn.toISOString().slice(0, 10),
     description: t.description,
     created_by: t.createdBy,
@@ -56,6 +68,8 @@ const transactionSchema = z.object({
   category_id: z.string().nullable(),
   kind: z.enum(['income', 'expense']),
   amount: z.number().positive(),
+  tax_rate: z.number().default(0),
+  wht_rate: z.number().default(0),
   occurred_on: z.string(),
   description: z.string(),
 })
@@ -75,6 +89,8 @@ transactionsRouter.post(
         categoryId: parsed.data.category_id,
         kind: parsed.data.kind,
         amount: parsed.data.amount,
+        taxRate: parsed.data.tax_rate,
+        whtRate: parsed.data.wht_rate,
         occurredOn: new Date(parsed.data.occurred_on),
         description: parsed.data.description,
         createdBy: req.userId,
@@ -99,6 +115,8 @@ transactionsRouter.put(
         categoryId: parsed.data.category_id,
         kind: parsed.data.kind,
         amount: parsed.data.amount,
+        taxRate: parsed.data.tax_rate,
+        whtRate: parsed.data.wht_rate,
         occurredOn: new Date(parsed.data.occurred_on),
         description: parsed.data.description,
       },

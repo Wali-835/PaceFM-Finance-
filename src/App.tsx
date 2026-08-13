@@ -12,6 +12,9 @@ import Budgets from '@/pages/Budgets'
 import Clients from '@/pages/Clients'
 import Invoices from '@/pages/Invoices'
 import InvoiceDetail from '@/pages/InvoiceDetail'
+import Vendors from '@/pages/Vendors'
+import Bills from '@/pages/Bills'
+import BillDetail from '@/pages/BillDetail'
 import SettingsPage from '@/pages/Settings'
 
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
@@ -69,6 +72,9 @@ function AppRoutes() {
         <Route path="clients" element={<Clients />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="invoices/:id" element={<InvoiceDetail />} />
+        <Route path="vendors" element={<Vendors />} />
+        <Route path="bills" element={<Bills />} />
+        <Route path="bills/:id" element={<BillDetail />} />
         <Route
           path="reports"
           element={

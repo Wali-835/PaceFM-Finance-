@@ -4,10 +4,26 @@ import { useCompany } from '@/context/CompanyContext'
 import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories'
 import { useAccounts, useCreateAccount } from '@/hooks/useAccounts'
 import { Button, Card, Input, Label, Select } from '@/components/ui'
+import { CURRENCIES } from '@/lib/currencies'
 import type { AccountType, CategoryKind } from '@/types/database'
 
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'PKR', 'INR']
 const CATEGORY_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#ef4444']
+
+const STARTER_CATEGORIES: { name: string; kind: CategoryKind }[] = [
+  { name: 'Services', kind: 'expense' },
+  { name: 'Supplies', kind: 'expense' },
+  { name: 'Software', kind: 'expense' },
+  { name: 'Rent', kind: 'expense' },
+  { name: 'Utilities', kind: 'expense' },
+  { name: 'Salaries', kind: 'expense' },
+  { name: 'Marketing', kind: 'expense' },
+  { name: 'Travel', kind: 'expense' },
+  { name: 'Professional Fees', kind: 'expense' },
+  { name: 'Other Expenses', kind: 'expense' },
+  { name: 'Sales', kind: 'income' },
+  { name: 'Services Revenue', kind: 'income' },
+  { name: 'Other Income', kind: 'income' },
+]
 
 export default function SettingsPage() {
   const { activeCompany, updateCompany } = useCompany()
@@ -20,6 +36,7 @@ export default function SettingsPage() {
   const deleteCategory = useDeleteCategory()
   const [categoryName, setCategoryName] = useState('')
   const [categoryKind, setCategoryKind] = useState<CategoryKind>('expense')
+  const [addingStarters, setAddingStarters] = useState(false)
 
   const { data: accounts = [] } = useAccounts()
   const createAccount = useCreateAccount()
@@ -41,6 +58,21 @@ export default function SettingsPage() {
     const color = CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]
     await createCategory.mutateAsync({ name: categoryName.trim(), kind: categoryKind, color })
     setCategoryName('')
+  }
+
+  async function handleAddStarterCategories() {
+    setAddingStarters(true)
+    try {
+      for (const [i, c] of STARTER_CATEGORIES.entries()) {
+        await createCategory.mutateAsync({
+          name: c.name,
+          kind: c.kind,
+          color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+        })
+      }
+    } finally {
+      setAddingStarters(false)
+    }
   }
 
   async function handleAddAccount(e: FormEvent) {
@@ -88,7 +120,14 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Categories</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Categories</h2>
+          {categories.length === 0 && (
+            <Button variant="secondary" onClick={handleAddStarterCategories} disabled={addingStarters}>
+              {addingStarters ? 'Adding…' : 'Add starter categories'}
+            </Button>
+          )}
+        </div>
         <form onSubmit={handleAddCategory} className="mb-4 flex flex-wrap items-end gap-3">
           <div className="flex-1">
             <Label htmlFor="category_name">New category</Label>

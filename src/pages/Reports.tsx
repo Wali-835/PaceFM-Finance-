@@ -26,8 +26,8 @@ export default function Reports() {
   const { data: categories = [] } = useCategories()
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
-  const income = transactions.filter((t) => t.kind === 'income').reduce((s, t) => s + t.amount, 0)
-  const expense = transactions.filter((t) => t.kind === 'expense').reduce((s, t) => s + t.amount, 0)
+  const income = transactions.filter((t) => t.kind === 'income').reduce((s, t) => s + t.total, 0)
+  const expense = transactions.filter((t) => t.kind === 'expense').reduce((s, t) => s + t.total, 0)
   const net = income - expense
 
   const expenseByCategory = useMemo(() => {
@@ -35,7 +35,7 @@ export default function Reports() {
     for (const t of transactions) {
       if (t.kind !== 'expense') continue
       const key = t.category_id ?? 'uncategorized'
-      map.set(key, (map.get(key) ?? 0) + t.amount)
+      map.set(key, (map.get(key) ?? 0) + t.total)
     }
     return [...map.entries()]
       .map(([categoryId, amount]) => ({

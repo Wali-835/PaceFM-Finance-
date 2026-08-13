@@ -34,6 +34,24 @@ const createCompanySchema = z.object({
   currency: z.string().min(1).max(10),
 })
 
+const CATEGORY_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#ef4444']
+
+const DEFAULT_CATEGORIES: { name: string; kind: 'income' | 'expense' }[] = [
+  { name: 'Services', kind: 'expense' },
+  { name: 'Supplies', kind: 'expense' },
+  { name: 'Software', kind: 'expense' },
+  { name: 'Rent', kind: 'expense' },
+  { name: 'Utilities', kind: 'expense' },
+  { name: 'Salaries', kind: 'expense' },
+  { name: 'Marketing', kind: 'expense' },
+  { name: 'Travel', kind: 'expense' },
+  { name: 'Professional Fees', kind: 'expense' },
+  { name: 'Other Expenses', kind: 'expense' },
+  { name: 'Sales', kind: 'income' },
+  { name: 'Services Revenue', kind: 'income' },
+  { name: 'Other Income', kind: 'income' },
+]
+
 companiesRouter.post(
   '/',
   asyncHandler(async (req, res) => {
@@ -50,6 +68,14 @@ companiesRouter.post(
       })
       await tx.companyMember.create({
         data: { companyId: created.id, userId: req.userId!, role: 'owner' },
+      })
+      await tx.category.createMany({
+        data: DEFAULT_CATEGORIES.map((c, i) => ({
+          companyId: created.id,
+          name: c.name,
+          kind: c.kind,
+          color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+        })),
       })
       return created
     })

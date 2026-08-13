@@ -2,8 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useCompany } from '@/context/CompanyContext'
 import { useAuth } from '@/context/AuthContext'
 import { Button, Input, Label, Select } from '@/components/ui'
-
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'PKR', 'INR']
+import { CURRENCIES } from '@/lib/currencies'
 
 export default function CreateCompany() {
   const { createCompany } = useCompany()

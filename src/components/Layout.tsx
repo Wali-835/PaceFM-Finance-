@@ -5,6 +5,8 @@ import {
   PiggyBank,
   Users,
   FileText,
+  Receipt,
+  Store,
   BarChart3,
   Settings,
   LogOut,
@@ -19,6 +21,8 @@ const NAV_ITEMS = [
   { to: '/budgets', label: 'Budgets', icon: PiggyBank },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/invoices', label: 'Invoices', icon: FileText },
+  { to: '/vendors', label: 'Vendors', icon: Store },
+  { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

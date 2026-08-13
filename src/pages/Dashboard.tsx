@@ -35,14 +35,14 @@ export default function Dashboard() {
     [transactions, currentMonth],
   )
 
-  const income = thisMonthTx.filter((t) => t.kind === 'income').reduce((s, t) => s + t.amount, 0)
-  const expense = thisMonthTx.filter((t) => t.kind === 'expense').reduce((s, t) => s + t.amount, 0)
+  const income = thisMonthTx.filter((t) => t.kind === 'income').reduce((s, t) => s + t.total, 0)
+  const expense = thisMonthTx.filter((t) => t.kind === 'expense').reduce((s, t) => s + t.total, 0)
   const net = income - expense
 
   const cashBalance = useMemo(() => {
     const openingTotal = accounts.reduce((s, a) => s + a.opening_balance, 0)
     const txTotal = transactions.reduce(
-      (s, t) => s + (t.kind === 'income' ? t.amount : -t.amount),
+      (s, t) => s + (t.kind === 'income' ? t.total : -t.total),
       0,
     )
     return openingTotal + txTotal
@@ -58,7 +58,7 @@ export default function Dashboard() {
     for (const t of transactions) {
       const key = t.occurred_on.slice(0, 7)
       if (!buckets[key]) continue
-      buckets[key][t.kind === 'income' ? 'income' : 'expense'] += t.amount
+      buckets[key][t.kind === 'income' ? 'income' : 'expense'] += t.total
     }
     return Object.values(buckets)
   }, [transactions])
@@ -69,7 +69,7 @@ export default function Dashboard() {
     .map((b) => {
       const spent = thisMonthTx
         .filter((t) => t.category_id === b.category_id && t.kind === 'expense')
-        .reduce((s, t) => s + t.amount, 0)
+        .reduce((s, t) => s + t.total, 0)
       return { ...b, spent, category: categoryMap.get(b.category_id) }
     })
     .filter((b) => b.category)
@@ -195,7 +195,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3">
                   <Badge tone={t.kind === 'income' ? 'positive' : 'negative'}>
                     {t.kind === 'income' ? '+' : '-'}
-                    {formatCurrency(t.amount, currency)}
+                    {formatCurrency(t.total, currency)}
                   </Badge>
                 </div>
               </div>

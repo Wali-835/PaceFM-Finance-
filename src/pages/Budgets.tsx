@@ -47,7 +47,7 @@ export default function Budgets() {
     const map = new Map<string, number>()
     for (const t of transactions) {
       if (!t.category_id) continue
-      map.set(t.category_id, (map.get(t.category_id) ?? 0) + t.amount)
+      map.set(t.category_id, (map.get(t.category_id) ?? 0) + t.total)
     }
     return map
   }, [transactions])
