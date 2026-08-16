@@ -79,6 +79,7 @@ export type Invoice = {
   due_date: string
   notes: string
   tax_rate: number
+  wht_rate: number
   created_at: string
 }
 

@@ -51,6 +51,7 @@ export default function InvoiceDetail() {
     due_date: defaultDueDate(),
     notes: '',
     tax_rate: 0,
+    wht_rate: 0,
     items: [emptyItem()],
   })
 
@@ -71,6 +72,7 @@ export default function InvoiceDetail() {
         due_date: loaded.invoice.due_date,
         notes: loaded.invoice.notes,
         tax_rate: loaded.invoice.tax_rate,
+        wht_rate: loaded.invoice.wht_rate,
         items: loaded.items.map((i) => ({
           description: i.description,
           unit: i.unit,
@@ -86,7 +88,8 @@ export default function InvoiceDetail() {
     [form.items],
   )
   const taxAmount = subtotal * (form.tax_rate / 100)
-  const total = subtotal + taxAmount
+  const whtAmount = subtotal * (form.wht_rate / 100)
+  const total = subtotal + taxAmount - whtAmount
 
   function updateItem(index: number, patch: Partial<InvoiceItemInput>) {
     setForm((f) => ({
@@ -190,16 +193,29 @@ export default function InvoiceDetail() {
               ))}
             </Select>
           </div>
-          <div>
-            <Label htmlFor="tax_rate">Tax rate (%)</Label>
-            <Input
-              id="tax_rate"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.tax_rate}
-              onChange={(e) => setForm((f) => ({ ...f, tax_rate: Number(e.target.value) }))}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="tax_rate">Tax (%)</Label>
+              <Input
+                id="tax_rate"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.tax_rate}
+                onChange={(e) => setForm((f) => ({ ...f, tax_rate: Number(e.target.value) }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="wht_rate">WHT (%)</Label>
+              <Input
+                id="wht_rate"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.wht_rate}
+                onChange={(e) => setForm((f) => ({ ...f, wht_rate: Number(e.target.value) }))}
+              />
+            </div>
           </div>
           <div>
             <Label htmlFor="issue_date">Issue date</Label>
@@ -297,6 +313,10 @@ export default function InvoiceDetail() {
             <div className="flex justify-between text-slate-500 dark:text-slate-400">
               <span>Tax ({form.tax_rate}%)</span>
               <span>{formatCurrency(taxAmount, currency)}</span>
+            </div>
+            <div className="flex justify-between text-slate-500 dark:text-slate-400">
+              <span>WHT ({form.wht_rate}%)</span>
+              <span>-{formatCurrency(whtAmount, currency)}</span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100">
               <span>Total</span>

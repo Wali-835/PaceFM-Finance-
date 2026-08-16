@@ -13,6 +13,7 @@ import { clientsRouter } from './routes/clients.js'
 import { invoicesRouter } from './routes/invoices.js'
 import { vendorsRouter } from './routes/vendors.js'
 import { billsRouter } from './routes/bills.js'
+import { reportsRouter } from './routes/reports.js'
 
 const app = express()
 
@@ -37,6 +38,7 @@ app.use('/api/companies/:companyId/clients', clientsRouter)
 app.use('/api/companies/:companyId/invoices', invoicesRouter)
 app.use('/api/companies/:companyId/vendors', vendorsRouter)
 app.use('/api/companies/:companyId/bills', billsRouter)
+app.use('/api/companies/:companyId/reports', reportsRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` })

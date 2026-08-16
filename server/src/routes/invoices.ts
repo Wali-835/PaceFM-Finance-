@@ -10,14 +10,15 @@ invoicesRouter.use(requireAuth, requireCompanyMember())
 
 type InvoiceWithItems = Prisma.InvoiceGetPayload<{ include: { items: true; client: true } }>
 
-function computeTotals(items: { quantity: unknown; unitPrice: unknown }[], taxRate: unknown) {
+function computeTotals(items: { quantity: unknown; unitPrice: unknown }[], taxRate: unknown, whtRate: unknown) {
   const subtotal = items.reduce((s, i) => s + Number(i.quantity) * Number(i.unitPrice), 0)
   const taxAmount = subtotal * (Number(taxRate) / 100)
-  return { subtotal, taxAmount, total: subtotal + taxAmount }
+  const whtAmount = subtotal * (Number(whtRate) / 100)
+  return { subtotal, taxAmount, whtAmount, total: subtotal + taxAmount - whtAmount }
 }
 
 function serializeInvoice(inv: InvoiceWithItems) {
-  const { subtotal, taxAmount, total } = computeTotals(inv.items, inv.taxRate)
+  const { subtotal, taxAmount, whtAmount, total } = computeTotals(inv.items, inv.taxRate, inv.whtRate)
   return {
     id: inv.id,
     company_id: inv.companyId,
@@ -29,9 +30,11 @@ function serializeInvoice(inv: InvoiceWithItems) {
     due_date: inv.dueDate.toISOString().slice(0, 10),
     notes: inv.notes,
     tax_rate: Number(inv.taxRate),
+    wht_rate: Number(inv.whtRate),
     created_at: inv.createdAt.toISOString(),
     subtotal,
     tax_amount: taxAmount,
+    wht_amount: whtAmount,
     total,
   }
 }
@@ -92,6 +95,7 @@ const invoiceSchema = z.object({
   due_date: z.string(),
   notes: z.string(),
   tax_rate: z.number(),
+  wht_rate: z.number().default(0),
   items: z.array(itemSchema),
 })
 
@@ -114,6 +118,7 @@ invoicesRouter.post(
         dueDate: new Date(fields.due_date),
         notes: fields.notes,
         taxRate: fields.tax_rate,
+        whtRate: fields.wht_rate,
         items: {
           create: items.map((item, position) => ({
             description: item.description,
@@ -151,6 +156,7 @@ invoicesRouter.put(
           dueDate: new Date(fields.due_date),
           notes: fields.notes,
           taxRate: fields.tax_rate,
+          whtRate: fields.wht_rate,
         },
       })
       await tx.invoiceItem.deleteMany({ where: { invoiceId: req.params.invoiceId } })

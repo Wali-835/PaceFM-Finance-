@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useInvoices } from '@/hooks/useInvoices'
 import { useBills } from '@/hooks/useBills'
 import { useCompany } from '@/context/CompanyContext'
-import { Card, EmptyState, Input, Label } from '@/components/ui'
+import { Button, Card, EmptyState, Input, Label } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 function startOfMonth() {
   const d = new Date()
@@ -90,11 +93,24 @@ export default function Reports() {
     return [...map.values()].sort((a, b) => b.outstanding - a.outstanding || b.billed - a.billed)
   }, [bills, from, to])
 
+  const exportUrl = activeCompany
+    ? `${API_URL}/api/companies/${activeCompany.id}/reports/export?from=${from}&to=${to}`
+    : undefined
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Reports</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Profit &amp; loss for a custom date range</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Reports</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Profit &amp; loss for a custom date range</p>
+        </div>
+        <Button
+          variant="secondary"
+          disabled={!exportUrl}
+          onClick={() => exportUrl && window.open(exportUrl, '_blank')}
+        >
+          <Download size={16} /> Export to Excel
+        </Button>
       </div>
 
       <Card>

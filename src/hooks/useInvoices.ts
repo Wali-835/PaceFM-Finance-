@@ -7,6 +7,7 @@ export type InvoiceWithTotals = Invoice & {
   total: number
   subtotal: number
   tax_amount: number
+  wht_amount: number
   client_name: string | null
 }
 
@@ -50,6 +51,7 @@ export interface InvoiceInput {
   due_date: string
   notes: string
   tax_rate: number
+  wht_rate: number
   items: InvoiceItemInput[]
 }
 
