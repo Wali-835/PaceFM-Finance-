@@ -10,7 +10,7 @@ import type { AccountType, CategoryKind } from '@/types/database'
 
 type EtaTestResult =
   | { ok: true; environment: string }
-  | { ok: false; error: string; environment?: string; status?: number | null }
+  | { ok: false; error: string; environment?: string; status?: number | null; details?: string }
 
 const CATEGORY_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#ef4444']
 
@@ -106,7 +106,17 @@ export default function SettingsPage() {
       setEtaResult(result)
     } catch (err) {
       if (err instanceof ApiError) {
-        setEtaResult({ ok: false, error: err.message })
+        const body = err.body as
+          | { environment?: string; status?: number | null; details?: unknown }
+          | null
+          | undefined
+        setEtaResult({
+          ok: false,
+          error: err.message,
+          environment: body?.environment,
+          status: body?.status ?? err.status,
+          details: body?.details !== undefined ? JSON.stringify(body.details, null, 2) : undefined,
+        })
       } else {
         setEtaResult({ ok: false, error: 'Something went wrong' })
       }
@@ -272,14 +282,30 @@ export default function SettingsPage() {
             ) : (
               <XCircle size={18} className="mt-0.5 shrink-0" />
             )}
-            <div>
+            <div className="min-w-0 flex-1">
               {etaResult.ok ? (
                 <p>
                   Connected successfully to the <strong>{etaResult.environment}</strong> environment. Credentials
                   are valid.
                 </p>
               ) : (
-                <p>{etaResult.error}</p>
+                <div className="space-y-2">
+                  <p>
+                    {etaResult.error}
+                    {etaResult.environment && (
+                      <>
+                        {' '}
+                        (<strong>{etaResult.environment}</strong> environment
+                        {etaResult.status ? `, HTTP ${etaResult.status}` : ''})
+                      </>
+                    )}
+                  </p>
+                  {etaResult.details && (
+                    <pre className="overflow-x-auto rounded bg-slate-900/90 p-2 text-xs text-slate-100">
+                      {etaResult.details}
+                    </pre>
+                  )}
+                </div>
               )}
             </div>
           </div>
