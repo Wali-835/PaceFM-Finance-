@@ -3,15 +3,26 @@
 // IMPORTANT: the token endpoint URL, request shape, and `scope` value below
 // are a best-effort implementation of the standard OAuth2 client-credentials
 // pattern ETA's identity server is documented to use. They have NOT been
-// verified against ETA's current live documentation or tested against a
-// real ETA server — this environment has no network access to eta.gov.eg.
-// Treat this as a starting point: if `getAccessToken` fails, the error
-// message/body from ETA is surfaced as-is (see routes/eta.ts) so it can be
-// compared against ETA's actual API docs and corrected here.
+// verified against ETA's current live documentation — this environment has
+// no network access to eta.gov.eg. Treat this as a starting point: if
+// `getAccessToken` fails, the error message/body from ETA is surfaced as-is
+// (see routes/eta.ts) so it can be compared against ETA's actual API docs
+// and corrected here.
+//
+// The token URL (`/connect/token`) matches IdentityServer4's default route,
+// which supports two ways for a confidential client to authenticate:
+// `client_secret_basic` (client_id/secret in an HTTP Basic Authorization
+// header) or `client_secret_post` (client_id/secret in the form body). Which
+// one ETA's client registration expects isn't documented anywhere we can
+// verify, so `getAccessToken` tries Basic auth first and falls back to
+// posting the credentials in the body if that's rejected.
 //
 // Everything below the token fetch (document submission, signing handoff,
 // polling received documents) is not built yet — this is deliberately
-// scoped to "prove the credentials work" as the first testable step.
+// scoped to "prove the credentials work" as the first testable step. Note
+// this token step is unrelated to the USB signing token/HSM ETA issues
+// separately — that's only needed later, to digitally sign the invoice
+// document itself before submission.
 
 type EtaEnvironment = 'preprod' | 'production'
 
@@ -62,32 +73,30 @@ function requireCredentials() {
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null
 
-export async function getAccessToken(forceRefresh = false): Promise<string> {
-  if (!forceRefresh && cachedToken && cachedToken.expiresAt > Date.now() + 30_000) {
-    return cachedToken.accessToken
+type ClientAuthMethod = 'basic' | 'post'
+
+async function requestToken(
+  clientId: string,
+  clientSecret: string,
+  authMethod: ClientAuthMethod,
+): Promise<{ accessToken: string; expiresIn: number }> {
+  const params = new URLSearchParams({ grant_type: 'client_credentials', scope: 'InvoicingAPI' })
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+  if (authMethod === 'basic') {
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+  } else {
+    params.set('client_id', clientId)
+    params.set('client_secret', clientSecret)
   }
-
-  const { clientId, clientSecret } = requireCredentials()
-
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: 'InvoicingAPI',
-  })
 
   let res: Response
   try {
-    res = await fetch(getTokenUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    })
+    res = await fetch(getTokenUrl(), { method: 'POST', headers, body: params })
   } catch (err) {
-    const wrapped = new EtaApiError(
+    throw new EtaApiError(
       `Could not reach ETA token endpoint (${getTokenUrl()}): ${err instanceof Error ? err.message : String(err)}`,
     )
-    throw wrapped
   }
 
   const text = await res.text()
@@ -99,7 +108,7 @@ export async function getAccessToken(forceRefresh = false): Promise<string> {
   }
 
   if (!res.ok) {
-    const err = new EtaApiError(`ETA token request failed with status ${res.status}`)
+    const err = new EtaApiError(`ETA token request failed with status ${res.status} (client auth: ${authMethod})`)
     err.status = res.status
     err.body = data
     throw err
@@ -112,9 +121,33 @@ export async function getAccessToken(forceRefresh = false): Promise<string> {
     throw err
   }
 
+  return { accessToken: parsed.access_token, expiresIn: parsed.expires_in ?? 3600 }
+}
+
+export async function getAccessToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && cachedToken && cachedToken.expiresAt > Date.now() + 30_000) {
+    return cachedToken.accessToken
+  }
+
+  const { clientId, clientSecret } = requireCredentials()
+
+  let result: { accessToken: string; expiresIn: number }
+  try {
+    result = await requestToken(clientId, clientSecret, 'basic')
+  } catch (basicErr) {
+    try {
+      result = await requestToken(clientId, clientSecret, 'post')
+    } catch (postErr) {
+      if (postErr instanceof EtaApiError && basicErr instanceof Error) {
+        postErr.message = `${postErr.message}. Also tried HTTP Basic client auth: ${basicErr.message}`
+      }
+      throw postErr
+    }
+  }
+
   cachedToken = {
-    accessToken: parsed.access_token,
-    expiresAt: Date.now() + (parsed.expires_in ?? 3600) * 1000,
+    accessToken: result.accessToken,
+    expiresAt: Date.now() + result.expiresIn * 1000,
   }
   return cachedToken.accessToken
 }
