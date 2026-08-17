@@ -19,6 +19,12 @@ export interface ClientInput {
   email: string | null
   phone: string | null
   address: string | null
+  eta_buyer_type: string
+  eta_tax_registration_number: string | null
+  eta_governorate: string | null
+  eta_region_city: string | null
+  eta_street: string | null
+  eta_building_number: string | null
 }
 
 export function useCreateClient() {

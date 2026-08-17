@@ -10,6 +10,13 @@ export type Company = {
   currency: string
   created_by: string
   created_at: string
+  eta_tax_registration_number: string | null
+  eta_branch_id: string
+  eta_activity_code: string | null
+  eta_governorate: string | null
+  eta_region_city: string | null
+  eta_street: string | null
+  eta_building_number: string | null
 }
 
 export type Account = {
@@ -67,6 +74,12 @@ export type Client = {
   phone: string | null
   address: string | null
   created_at: string
+  eta_buyer_type: string
+  eta_tax_registration_number: string | null
+  eta_governorate: string | null
+  eta_region_city: string | null
+  eta_street: string | null
+  eta_building_number: string | null
 }
 
 export type Invoice = {

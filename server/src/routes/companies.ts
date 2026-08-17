@@ -7,13 +7,35 @@ import { asyncHandler } from '../lib/asyncHandler.js'
 export const companiesRouter = Router()
 companiesRouter.use(requireAuth)
 
-function serializeCompany(c: { id: string; name: string; currency: string; createdBy: string; createdAt: Date }) {
+type CompanyRecord = {
+  id: string
+  name: string
+  currency: string
+  createdBy: string
+  createdAt: Date
+  etaTaxRegistrationNumber: string | null
+  etaBranchId: string
+  etaActivityCode: string | null
+  etaGovernorate: string | null
+  etaRegionCity: string | null
+  etaStreet: string | null
+  etaBuildingNumber: string | null
+}
+
+function serializeCompany(c: CompanyRecord) {
   return {
     id: c.id,
     name: c.name,
     currency: c.currency,
     created_by: c.createdBy,
     created_at: c.createdAt.toISOString(),
+    eta_tax_registration_number: c.etaTaxRegistrationNumber,
+    eta_branch_id: c.etaBranchId,
+    eta_activity_code: c.etaActivityCode,
+    eta_governorate: c.etaGovernorate,
+    eta_region_city: c.etaRegionCity,
+    eta_street: c.etaStreet,
+    eta_building_number: c.etaBuildingNumber,
   }
 }
 
@@ -87,6 +109,13 @@ companiesRouter.post(
 const updateCompanySchema = z.object({
   name: z.string().min(1).optional(),
   currency: z.string().min(1).max(10).optional(),
+  eta_tax_registration_number: z.string().nullable().optional(),
+  eta_branch_id: z.string().min(1).optional(),
+  eta_activity_code: z.string().nullable().optional(),
+  eta_governorate: z.string().nullable().optional(),
+  eta_region_city: z.string().nullable().optional(),
+  eta_street: z.string().nullable().optional(),
+  eta_building_number: z.string().nullable().optional(),
 })
 
 companiesRouter.patch(
@@ -98,9 +127,19 @@ companiesRouter.patch(
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' })
       return
     }
+    const { eta_tax_registration_number, eta_branch_id, eta_activity_code, eta_governorate, eta_region_city, eta_street, eta_building_number, ...rest } = parsed.data
     const company = await prisma.company.update({
       where: { id: req.params.companyId },
-      data: parsed.data,
+      data: {
+        ...rest,
+        etaTaxRegistrationNumber: eta_tax_registration_number,
+        etaBranchId: eta_branch_id,
+        etaActivityCode: eta_activity_code,
+        etaGovernorate: eta_governorate,
+        etaRegionCity: eta_region_city,
+        etaStreet: eta_street,
+        etaBuildingNumber: eta_building_number,
+      },
     })
     res.json(serializeCompany(company))
   }),

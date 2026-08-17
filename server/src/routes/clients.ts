@@ -7,7 +7,7 @@ import { asyncHandler } from '../lib/asyncHandler.js'
 export const clientsRouter = Router({ mergeParams: true })
 clientsRouter.use(requireAuth, requireCompanyMember())
 
-function serializeClient(c: {
+type ClientRecord = {
   id: string
   companyId: string
   name: string
@@ -15,7 +15,15 @@ function serializeClient(c: {
   phone: string | null
   address: string | null
   createdAt: Date
-}) {
+  etaBuyerType: string
+  etaTaxRegistrationNumber: string | null
+  etaGovernorate: string | null
+  etaRegionCity: string | null
+  etaStreet: string | null
+  etaBuildingNumber: string | null
+}
+
+function serializeClient(c: ClientRecord) {
   return {
     id: c.id,
     company_id: c.companyId,
@@ -24,6 +32,12 @@ function serializeClient(c: {
     phone: c.phone,
     address: c.address,
     created_at: c.createdAt.toISOString(),
+    eta_buyer_type: c.etaBuyerType,
+    eta_tax_registration_number: c.etaTaxRegistrationNumber,
+    eta_governorate: c.etaGovernorate,
+    eta_region_city: c.etaRegionCity,
+    eta_street: c.etaStreet,
+    eta_building_number: c.etaBuildingNumber,
   }
 }
 
@@ -43,7 +57,26 @@ const clientSchema = z.object({
   email: z.string().nullable(),
   phone: z.string().nullable(),
   address: z.string().nullable(),
+  eta_buyer_type: z.enum(['B', 'P', 'F']).default('B'),
+  eta_tax_registration_number: z.string().nullable().default(null),
+  eta_governorate: z.string().nullable().default(null),
+  eta_region_city: z.string().nullable().default(null),
+  eta_street: z.string().nullable().default(null),
+  eta_building_number: z.string().nullable().default(null),
 })
+
+function toClientData(fields: z.infer<typeof clientSchema>) {
+  const { eta_buyer_type, eta_tax_registration_number, eta_governorate, eta_region_city, eta_street, eta_building_number, ...rest } = fields
+  return {
+    ...rest,
+    etaBuyerType: eta_buyer_type,
+    etaTaxRegistrationNumber: eta_tax_registration_number,
+    etaGovernorate: eta_governorate,
+    etaRegionCity: eta_region_city,
+    etaStreet: eta_street,
+    etaBuildingNumber: eta_building_number,
+  }
+}
 
 clientsRouter.post(
   '/',
@@ -54,7 +87,7 @@ clientsRouter.post(
       return
     }
     const client = await prisma.client.create({
-      data: { companyId: req.params.companyId, ...parsed.data },
+      data: { companyId: req.params.companyId, ...toClientData(parsed.data) },
     })
     res.status(201).json(serializeClient(client))
   }),
@@ -70,7 +103,7 @@ clientsRouter.put(
     }
     const client = await prisma.client.update({
       where: { id: req.params.clientId, companyId: req.params.companyId },
-      data: parsed.data,
+      data: toClientData(parsed.data),
     })
     res.json(serializeClient(client))
   }),

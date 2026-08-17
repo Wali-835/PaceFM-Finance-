@@ -49,6 +49,15 @@ export default function SettingsPage() {
   const [accountType, setAccountType] = useState<AccountType>('bank')
   const [openingBalance, setOpeningBalance] = useState('0')
 
+  const [etaTaxRegNo, setEtaTaxRegNo] = useState(activeCompany?.eta_tax_registration_number ?? '')
+  const [etaBranchId, setEtaBranchId] = useState(activeCompany?.eta_branch_id ?? '0')
+  const [etaActivityCode, setEtaActivityCode] = useState(activeCompany?.eta_activity_code ?? '')
+  const [etaGovernorate, setEtaGovernorate] = useState(activeCompany?.eta_governorate ?? '')
+  const [etaRegionCity, setEtaRegionCity] = useState(activeCompany?.eta_region_city ?? '')
+  const [etaStreet, setEtaStreet] = useState(activeCompany?.eta_street ?? '')
+  const [etaBuildingNumber, setEtaBuildingNumber] = useState(activeCompany?.eta_building_number ?? '')
+  const [savingEtaProfile, setSavingEtaProfile] = useState(false)
+
   const [testingEta, setTestingEta] = useState(false)
   const [etaResult, setEtaResult] = useState<EtaTestResult | null>(null)
 
@@ -58,6 +67,22 @@ export default function SettingsPage() {
     setSavingProfile(true)
     await updateCompany(activeCompany.id, { name, currency })
     setSavingProfile(false)
+  }
+
+  async function handleEtaProfileSave(e: FormEvent) {
+    e.preventDefault()
+    if (!activeCompany) return
+    setSavingEtaProfile(true)
+    await updateCompany(activeCompany.id, {
+      eta_tax_registration_number: etaTaxRegNo.trim() || null,
+      eta_branch_id: etaBranchId.trim() || '0',
+      eta_activity_code: etaActivityCode.trim() || null,
+      eta_governorate: etaGovernorate.trim() || null,
+      eta_region_city: etaRegionCity.trim() || null,
+      eta_street: etaStreet.trim() || null,
+      eta_building_number: etaBuildingNumber.trim() || null,
+    })
+    setSavingEtaProfile(false)
   }
 
   async function handleAddCategory(e: FormEvent) {
@@ -252,6 +277,48 @@ export default function SettingsPage() {
             ))
           )}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">E-invoicing issuer profile</h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          Your ETA registration details. Required on every e-invoice document once submission is wired up.
+        </p>
+        <form onSubmit={handleEtaProfileSave} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="eta_trn">Tax Registration Number</Label>
+            <Input id="eta_trn" value={etaTaxRegNo} onChange={(e) => setEtaTaxRegNo(e.target.value)} placeholder="e.g. 123456789" />
+          </div>
+          <div>
+            <Label htmlFor="eta_branch">Branch ID</Label>
+            <Input id="eta_branch" value={etaBranchId} onChange={(e) => setEtaBranchId(e.target.value)} placeholder="0" />
+          </div>
+          <div>
+            <Label htmlFor="eta_activity">Activity code</Label>
+            <Input id="eta_activity" value={etaActivityCode} onChange={(e) => setEtaActivityCode(e.target.value)} placeholder="e.g. 6201" />
+          </div>
+          <div>
+            <Label htmlFor="eta_governorate">Governorate</Label>
+            <Input id="eta_governorate" value={etaGovernorate} onChange={(e) => setEtaGovernorate(e.target.value)} placeholder="e.g. Cairo" />
+          </div>
+          <div>
+            <Label htmlFor="eta_region_city">Region / City</Label>
+            <Input id="eta_region_city" value={etaRegionCity} onChange={(e) => setEtaRegionCity(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="eta_street">Street</Label>
+            <Input id="eta_street" value={etaStreet} onChange={(e) => setEtaStreet(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="eta_building">Building number</Label>
+            <Input id="eta_building" value={etaBuildingNumber} onChange={(e) => setEtaBuildingNumber(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={savingEtaProfile}>
+              {savingEtaProfile ? 'Saving…' : 'Save issuer profile'}
+            </Button>
+          </div>
+        </form>
       </Card>
 
       <Card>

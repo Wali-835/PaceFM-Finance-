@@ -7,10 +7,21 @@ import {
   useUpdateClient,
   type ClientInput,
 } from '@/hooks/useClients'
-import { Button, EmptyState, Input, Label, Modal } from '@/components/ui'
+import { Button, EmptyState, Input, Label, Modal, Select } from '@/components/ui'
 import type { Client } from '@/types/database'
 
-const emptyForm: ClientInput = { name: '', email: '', phone: '', address: '' }
+const emptyForm: ClientInput = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  eta_buyer_type: 'B',
+  eta_tax_registration_number: null,
+  eta_governorate: null,
+  eta_region_city: null,
+  eta_street: null,
+  eta_building_number: null,
+}
 
 export default function Clients() {
   const { data: clients = [], isLoading } = useClients()
@@ -30,7 +41,18 @@ export default function Clients() {
 
   function openEdit(c: Client) {
     setEditing(c)
-    setForm({ name: c.name, email: c.email, phone: c.phone, address: c.address })
+    setForm({
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      address: c.address,
+      eta_buyer_type: c.eta_buyer_type,
+      eta_tax_registration_number: c.eta_tax_registration_number,
+      eta_governorate: c.eta_governorate,
+      eta_region_city: c.eta_region_city,
+      eta_street: c.eta_street,
+      eta_building_number: c.eta_building_number,
+    })
     setModalOpen(true)
   }
 
@@ -126,6 +148,65 @@ export default function Clients() {
             <Label htmlFor="address">Address</Label>
             <Input id="address" value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || null }))} />
           </div>
+
+          <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="mb-3 text-xs font-medium uppercase text-slate-400">E-invoicing (ETA)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="eta_buyer_type">Buyer type</Label>
+                <Select
+                  id="eta_buyer_type"
+                  value={form.eta_buyer_type}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_buyer_type: e.target.value }))}
+                >
+                  <option value="B">Business</option>
+                  <option value="P">Natural person</option>
+                  <option value="F">Foreigner</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="eta_client_trn">Tax registration no.</Label>
+                <Input
+                  id="eta_client_trn"
+                  value={form.eta_tax_registration_number ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_tax_registration_number: e.target.value || null }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="eta_client_governorate">Governorate</Label>
+                <Input
+                  id="eta_client_governorate"
+                  value={form.eta_governorate ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_governorate: e.target.value || null }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="eta_client_region_city">Region / City</Label>
+                <Input
+                  id="eta_client_region_city"
+                  value={form.eta_region_city ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_region_city: e.target.value || null }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="eta_client_street">Street</Label>
+                <Input
+                  id="eta_client_street"
+                  value={form.eta_street ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_street: e.target.value || null }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="eta_client_building">Building number</Label>
+                <Input
+                  id="eta_client_building"
+                  value={form.eta_building_number ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, eta_building_number: e.target.value || null }))}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
               Cancel

@@ -9,8 +9,20 @@ interface CompanyContextValue {
   loading: boolean
   setActiveCompanyId: (id: string) => void
   createCompany: (name: string, currency: string) => Promise<{ error: string | null }>
-  updateCompany: (id: string, patch: { name?: string; currency?: string }) => Promise<{ error: string | null }>
+  updateCompany: (id: string, patch: CompanyPatch) => Promise<{ error: string | null }>
   refresh: () => Promise<void>
+}
+
+export interface CompanyPatch {
+  name?: string
+  currency?: string
+  eta_tax_registration_number?: string | null
+  eta_branch_id?: string
+  eta_activity_code?: string | null
+  eta_governorate?: string | null
+  eta_region_city?: string | null
+  eta_street?: string | null
+  eta_building_number?: string | null
 }
 
 const CompanyContext = createContext<CompanyContextValue | null>(null)
@@ -69,7 +81,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function updateCompany(id: string, patch: { name?: string; currency?: string }) {
+  async function updateCompany(id: string, patch: CompanyPatch) {
     try {
       await api.patch(`/api/companies/${id}`, patch)
       await refresh()

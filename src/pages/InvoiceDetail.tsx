@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Printer, Trash2 } from 'lucide-react'
+import { Download, FileJson, Plus, Printer, Trash2 } from 'lucide-react'
 import {
   useCreateInvoice,
   useDeleteInvoice,
@@ -14,6 +14,7 @@ import { useClients } from '@/hooks/useClients'
 import { useCompany } from '@/context/CompanyContext'
 import { Button, Card, Input, Label, Select } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
+import { api, ApiError } from '@/lib/api'
 import type { InvoiceStatus } from '@/types/database'
 
 function defaultDueDate() {
@@ -125,6 +126,43 @@ export default function InvoiceDetail() {
   }
 
   const saving = createInvoice.isPending || updateInvoice.isPending
+
+  const [etaDocument, setEtaDocument] = useState<unknown | null>(null)
+  const [etaDocError, setEtaDocError] = useState<{ message: string; missingFields?: string[] } | null>(null)
+  const [loadingEtaDoc, setLoadingEtaDoc] = useState(false)
+
+  async function handlePreviewEtaDocument() {
+    if (!activeCompany || !id || isNew) return
+    setLoadingEtaDoc(true)
+    setEtaDocument(null)
+    setEtaDocError(null)
+    try {
+      const result = await api.get<{ document: unknown }>(
+        `/api/companies/${activeCompany.id}/eta/invoices/${id}/document`,
+      )
+      setEtaDocument(result.document)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const body = err.body as { missing_fields?: string[] } | null | undefined
+        setEtaDocError({ message: err.message, missingFields: body?.missing_fields })
+      } else {
+        setEtaDocError({ message: 'Something went wrong' })
+      }
+    } finally {
+      setLoadingEtaDoc(false)
+    }
+  }
+
+  function handleDownloadEtaDocument() {
+    if (!etaDocument) return
+    const blob = new Blob([JSON.stringify(etaDocument, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${form.invoice_number || 'invoice'}-eta-document.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-6">
@@ -337,6 +375,47 @@ export default function InvoiceDetail() {
           placeholder="Payment terms, thank-you note, etc."
         />
       </Card>
+
+      {!isNew && (
+        <Card className="print:hidden">
+          <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            ETA e-invoice document
+          </h2>
+          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+            Builds the unsigned ETA e-invoice document for this invoice, for review. Signing and submission aren't
+            wired up yet — this is a preview only, nothing is sent to ETA.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={handlePreviewEtaDocument} disabled={loadingEtaDoc}>
+              <FileJson size={16} /> {loadingEtaDoc ? 'Building…' : 'Preview document'}
+            </Button>
+            {etaDocument !== null && (
+              <Button variant="secondary" onClick={handleDownloadEtaDocument}>
+                <Download size={16} /> Download JSON
+              </Button>
+            )}
+          </div>
+
+          {etaDocError && (
+            <div className="mt-4 rounded-lg bg-negative-500/10 p-3 text-sm text-negative-600 dark:text-negative-500">
+              <p>{etaDocError.message}</p>
+              {etaDocError.missingFields && etaDocError.missingFields.length > 0 && (
+                <ul className="mt-2 list-inside list-disc">
+                  {etaDocError.missingFields.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {etaDocument !== null && (
+            <pre className="mt-4 max-h-96 overflow-auto rounded bg-slate-900/90 p-3 text-xs text-slate-100">
+              {JSON.stringify(etaDocument, null, 2)}
+            </pre>
+          )}
+        </Card>
+      )}
     </div>
   )
 }

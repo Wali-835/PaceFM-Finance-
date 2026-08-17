@@ -78,6 +78,17 @@ model Company {
   invoices     Invoice[]
   vendors      Vendor[]
   bills        Bill[]
+
+  // ETA e-invoicing issuer profile. Required on the invoice document once
+  // we start submitting to ETA; optional here so existing companies aren't
+  // broken until this is filled in via Settings.
+  etaTaxRegistrationNumber String?
+  etaBranchId              String  @default("0")
+  etaActivityCode          String?
+  etaGovernorate           String?
+  etaRegionCity            String?
+  etaStreet                String?
+  etaBuildingNumber        String?
 }
 
 model CompanyMember {
@@ -162,6 +173,16 @@ model Client {
   createdAt DateTime  @default(now())
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices  Invoice[]
+
+  // ETA e-invoicing buyer profile. "B" = business, "P" = natural person,
+  // "F" = foreigner. Required on the invoice document once we start
+  // submitting to ETA; optional here so existing clients aren't broken.
+  etaBuyerType             String  @default("B")
+  etaTaxRegistrationNumber String?
+  etaGovernorate           String?
+  etaRegionCity            String?
+  etaStreet                String?
+  etaBuildingNumber        String?
 }
 
 model Invoice {
