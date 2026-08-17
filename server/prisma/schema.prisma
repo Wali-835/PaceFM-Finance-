@@ -35,6 +35,16 @@ enum InvoiceStatus {
   void
 }
 
+enum EtaSubmissionStatus {
+  not_submitted
+  pending_signature
+  signed
+  submitted
+  accepted
+  rejected
+  error
+}
+
 enum BillStatus {
   unpaid
   paid
@@ -169,6 +179,16 @@ model Invoice {
   company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   client        Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   items         InvoiceItem[]
+
+  // ETA e-invoicing submission tracking (Egypt). Not populated until the
+  // document-submission flow is built; for now this just reserves the
+  // columns so that flow doesn't need another migration later.
+  etaStatus         EtaSubmissionStatus @default(not_submitted)
+  etaUuid           String?
+  etaSubmissionUuid String?
+  etaLongId         String?
+  etaError          String?
+  etaSubmittedAt    DateTime?
 
   @@unique([companyId, invoiceNumber])
 }

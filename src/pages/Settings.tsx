@@ -1,11 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react'
 import { useCompany } from '@/context/CompanyContext'
 import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories'
 import { useAccounts, useCreateAccount } from '@/hooks/useAccounts'
 import { Button, Card, Input, Label, Select } from '@/components/ui'
 import { CURRENCIES } from '@/lib/currencies'
+import { api, ApiError } from '@/lib/api'
 import type { AccountType, CategoryKind } from '@/types/database'
+
+type EtaTestResult =
+  | { ok: true; environment: string }
+  | { ok: false; error: string; environment?: string; status?: number | null }
 
 const CATEGORY_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#ef4444']
 
@@ -43,6 +48,9 @@ export default function SettingsPage() {
   const [accountName, setAccountName] = useState('')
   const [accountType, setAccountType] = useState<AccountType>('bank')
   const [openingBalance, setOpeningBalance] = useState('0')
+
+  const [testingEta, setTestingEta] = useState(false)
+  const [etaResult, setEtaResult] = useState<EtaTestResult | null>(null)
 
   async function handleProfileSave(e: FormEvent) {
     e.preventDefault()
@@ -85,6 +93,26 @@ export default function SettingsPage() {
     })
     setAccountName('')
     setOpeningBalance('0')
+  }
+
+  async function handleTestEtaConnection() {
+    if (!activeCompany) return
+    setTestingEta(true)
+    setEtaResult(null)
+    try {
+      const result = await api.get<{ ok: true; environment: string }>(
+        `/api/companies/${activeCompany.id}/eta/test-connection`,
+      )
+      setEtaResult(result)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setEtaResult({ ok: false, error: err.message })
+      } else {
+        setEtaResult({ ok: false, error: 'Something went wrong' })
+      }
+    } finally {
+      setTestingEta(false)
+    }
   }
 
   return (
@@ -214,6 +242,48 @@ export default function SettingsPage() {
             ))
           )}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+          Egyptian Tax Authority (e-invoicing)
+        </h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          Checks that the ETA client credentials configured on the server can obtain an access token. Set
+          <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-800">ETA_CLIENT_ID</code>
+          and
+          <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-800">ETA_CLIENT_SECRET</code>
+          as environment variables on the API server before testing.
+        </p>
+        <Button variant="secondary" onClick={handleTestEtaConnection} disabled={testingEta || !activeCompany}>
+          {testingEta ? 'Testing…' : 'Test connection'}
+        </Button>
+
+        {etaResult && (
+          <div
+            className={`mt-4 flex items-start gap-2 rounded-lg p-3 text-sm ${
+              etaResult.ok
+                ? 'bg-positive-500/10 text-positive-600 dark:text-positive-500'
+                : 'bg-negative-500/10 text-negative-600 dark:text-negative-500'
+            }`}
+          >
+            {etaResult.ok ? (
+              <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+            ) : (
+              <XCircle size={18} className="mt-0.5 shrink-0" />
+            )}
+            <div>
+              {etaResult.ok ? (
+                <p>
+                  Connected successfully to the <strong>{etaResult.environment}</strong> environment. Credentials
+                  are valid.
+                </p>
+              ) : (
+                <p>{etaResult.error}</p>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )
