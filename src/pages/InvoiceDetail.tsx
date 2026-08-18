@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Download, FileJson, Plus, Printer, Trash2 } from 'lucide-react'
+import { Download, FileJson, Plus, Printer, Trash2, Upload } from 'lucide-react'
 import {
   useCreateInvoice,
   useDeleteInvoice,
@@ -162,6 +162,43 @@ export default function InvoiceDetail() {
     a.download = `${form.invoice_number || 'invoice'}-eta-document.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const [signedFileName, setSignedFileName] = useState<string | null>(null)
+  const [submittingEta, setSubmittingEta] = useState(false)
+  const [etaSubmitResult, setEtaSubmitResult] = useState<
+    | { ok: true; accepted: boolean; documentUuid?: string; longId?: string; errorSummary?: string }
+    | { ok: false; message: string }
+    | null
+  >(null)
+
+  async function handleUploadSignedDocument(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !activeCompany || !id || isNew) return
+
+    setSignedFileName(file.name)
+    setSubmittingEta(true)
+    setEtaSubmitResult(null)
+    try {
+      const text = await file.text()
+      const signedDocument = JSON.parse(text)
+      const result = await api.post<{ accepted: boolean; documentUuid?: string; longId?: string; errorSummary?: string }>(
+        `/api/companies/${activeCompany.id}/eta/invoices/${id}/submit`,
+        { signed_document: signedDocument },
+      )
+      setEtaSubmitResult({ ok: true, ...result })
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setEtaSubmitResult({ ok: false, message: 'That file is not valid JSON.' })
+      } else if (err instanceof ApiError) {
+        setEtaSubmitResult({ ok: false, message: err.message })
+      } else {
+        setEtaSubmitResult({ ok: false, message: 'Something went wrong' })
+      }
+    } finally {
+      setSubmittingEta(false)
+    }
   }
 
   return (
@@ -378,42 +415,101 @@ export default function InvoiceDetail() {
 
       {!isNew && (
         <Card className="print:hidden">
-          <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            ETA e-invoice document
-          </h2>
-          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            Builds the unsigned ETA e-invoice document for this invoice, for review. Signing and submission aren't
-            wired up yet — this is a preview only, nothing is sent to ETA.
-          </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={handlePreviewEtaDocument} disabled={loadingEtaDoc}>
-              <FileJson size={16} /> {loadingEtaDoc ? 'Building…' : 'Preview document'}
-            </Button>
-            {etaDocument !== null && (
-              <Button variant="secondary" onClick={handleDownloadEtaDocument}>
-                <Download size={16} /> Download JSON
-              </Button>
+          <div className="mb-1 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ETA e-invoice submission</h2>
+            {loaded?.invoice.eta_status && loaded.invoice.eta_status !== 'not_submitted' && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  loaded.invoice.eta_status === 'submitted' || loaded.invoice.eta_status === 'accepted'
+                    ? 'bg-positive-500/10 text-positive-600 dark:text-positive-500'
+                    : loaded.invoice.eta_status === 'rejected' || loaded.invoice.eta_status === 'error'
+                      ? 'bg-negative-500/10 text-negative-600 dark:text-negative-500'
+                      : 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {loaded.invoice.eta_status}
+              </span>
             )}
           </div>
+          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+            Step 1: preview and download the unsigned document. Step 2: sign it on your machine with your USB token
+            using ETA's CadesSigningAgent (or equivalent signer) — this never happens on our servers. Step 3: upload
+            the resulting signed document here to submit it to ETA.
+          </p>
 
-          {etaDocError && (
-            <div className="mt-4 rounded-lg bg-negative-500/10 p-3 text-sm text-negative-600 dark:text-negative-500">
-              <p>{etaDocError.message}</p>
-              {etaDocError.missingFields && etaDocError.missingFields.length > 0 && (
-                <ul className="mt-2 list-inside list-disc">
-                  {etaDocError.missingFields.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase text-slate-400">1. Unsigned document</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={handlePreviewEtaDocument} disabled={loadingEtaDoc}>
+                  <FileJson size={16} /> {loadingEtaDoc ? 'Building…' : 'Preview document'}
+                </Button>
+                {etaDocument !== null && (
+                  <Button variant="secondary" onClick={handleDownloadEtaDocument}>
+                    <Download size={16} /> Download JSON
+                  </Button>
+                )}
+              </div>
+
+              {etaDocError && (
+                <div className="mt-3 rounded-lg bg-negative-500/10 p-3 text-sm text-negative-600 dark:text-negative-500">
+                  <p>{etaDocError.message}</p>
+                  {etaDocError.missingFields && etaDocError.missingFields.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc">
+                      {etaDocError.missingFields.map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {etaDocument !== null && (
+                <pre className="mt-3 max-h-96 overflow-auto rounded bg-slate-900/90 p-3 text-xs text-slate-100">
+                  {JSON.stringify(etaDocument, null, 2)}
+                </pre>
               )}
             </div>
-          )}
 
-          {etaDocument !== null && (
-            <pre className="mt-4 max-h-96 overflow-auto rounded bg-slate-900/90 p-3 text-xs text-slate-100">
-              {JSON.stringify(etaDocument, null, 2)}
-            </pre>
-          )}
+            <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+              <p className="mb-2 text-xs font-medium uppercase text-slate-400">
+                2 &amp; 3. Upload signed document &amp; submit
+              </p>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 py-2 text-sm text-slate-600 hover:border-brand-500 hover:text-brand-600 dark:border-slate-700 dark:text-slate-300">
+                <Upload size={16} />
+                {submittingEta ? 'Submitting…' : signedFileName ?? 'Choose signed document (FullSignedDocument.json)'}
+                <input type="file" accept="application/json" className="hidden" onChange={handleUploadSignedDocument} disabled={submittingEta} />
+              </label>
+
+              {etaSubmitResult && (
+                <div
+                  className={`mt-3 rounded-lg p-3 text-sm ${
+                    etaSubmitResult.ok && etaSubmitResult.accepted
+                      ? 'bg-positive-500/10 text-positive-600 dark:text-positive-500'
+                      : 'bg-negative-500/10 text-negative-600 dark:text-negative-500'
+                  }`}
+                >
+                  {etaSubmitResult.ok ? (
+                    etaSubmitResult.accepted ? (
+                      <p>
+                        Accepted by ETA. Document UUID: <strong>{etaSubmitResult.documentUuid}</strong>
+                        {etaSubmitResult.longId && (
+                          <>
+                            {' '}
+                            · Long ID: <strong>{etaSubmitResult.longId}</strong>
+                          </>
+                        )}
+                      </p>
+                    ) : (
+                      <p>Rejected by ETA: {etaSubmitResult.errorSummary ?? 'no details returned'}</p>
+                    )
+                  ) : (
+                    <p>{etaSubmitResult.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </Card>
       )}
     </div>

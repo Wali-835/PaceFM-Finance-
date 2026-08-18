@@ -36,6 +36,12 @@ function serializeInvoice(inv: InvoiceWithItems) {
     tax_amount: taxAmount,
     wht_amount: whtAmount,
     total,
+    eta_status: inv.etaStatus,
+    eta_uuid: inv.etaUuid,
+    eta_submission_uuid: inv.etaSubmissionUuid,
+    eta_long_id: inv.etaLongId,
+    eta_error: inv.etaError,
+    eta_submitted_at: inv.etaSubmittedAt ? inv.etaSubmittedAt.toISOString() : null,
   }
 }
 

@@ -17,12 +17,21 @@
 // verify, so `getAccessToken` tries Basic auth first and falls back to
 // posting the credentials in the body if that's rejected.
 //
-// Everything below the token fetch (document submission, signing handoff,
-// polling received documents) is not built yet — this is deliberately
-// scoped to "prove the credentials work" as the first testable step. Note
-// this token step is unrelated to the USB signing token/HSM ETA issues
-// separately — that's only needed later, to digitally sign the invoice
-// document itself before submission.
+// Signing itself is NOT done here or anywhere in this backend: ETA requires
+// the document to be signed on a machine with the USB HSM token physically
+// attached (the private key never leaves the token), using ETA's own
+// CadesSigningAgent tool or an equivalent local signer. This service only
+// handles the token fetch and forwarding an already-signed document to
+// ETA's submission API — see routes/eta.ts for the "prepare unsigned
+// document" and "submit signed document" endpoints, and InvoiceDetail.tsx
+// on the frontend for the download/upload flow around the external signer.
+//
+// The submission endpoint/shape below is cross-checked against public ETA
+// SDK reference material (a published Postman collection covering ETA's
+// e-invoicing API) rather than pure guesswork, but still hasn't been
+// exercised against a live ETA server from this environment — verify the
+// first real submission's response shape against what submitDocument
+// assumes below and adjust if ETA's actual field names differ.
 
 type EtaEnvironment = 'preprod' | 'production'
 
@@ -150,4 +159,64 @@ export async function getAccessToken(forceRefresh = false): Promise<string> {
     expiresAt: Date.now() + result.expiresIn * 1000,
   }
   return cachedToken.accessToken
+}
+
+type EtaAcceptedDocument = { uuid?: string; submissionUUID?: string; longId?: string; hashKey?: string }
+type EtaRejectedDocument = { error?: unknown; internalId?: string; [key: string]: unknown }
+
+export type EtaSubmissionResult = {
+  accepted: boolean
+  submissionUuid?: string
+  documentUuid?: string
+  longId?: string
+  errorSummary?: string
+  raw: unknown
+}
+
+export async function submitDocument(signedDocument: unknown): Promise<EtaSubmissionResult> {
+  const token = await getAccessToken()
+
+  let res: Response
+  try {
+    res = await fetch(`${getApiBaseUrl()}/documentsubmissions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ documents: [signedDocument] }),
+    })
+  } catch (err) {
+    throw new EtaApiError(
+      `Could not reach ETA submission endpoint: ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+
+  const text = await res.text()
+  let data: unknown
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text
+  }
+
+  if (!res.ok) {
+    const err = new EtaApiError(`ETA document submission failed with status ${res.status}`)
+    err.status = res.status
+    err.body = data
+    throw err
+  }
+
+  const parsed = data as { submissionUUID?: string; acceptedDocuments?: EtaAcceptedDocument[]; rejectedDocuments?: EtaRejectedDocument[] } | null
+  const accepted = parsed?.acceptedDocuments?.[0]
+  const rejected = parsed?.rejectedDocuments?.[0]
+
+  return {
+    accepted: !!accepted && !rejected,
+    submissionUuid: parsed?.submissionUUID ?? accepted?.submissionUUID,
+    documentUuid: accepted?.uuid,
+    longId: accepted?.longId,
+    errorSummary: rejected ? JSON.stringify(rejected.error ?? rejected) : undefined,
+    raw: data,
+  }
 }

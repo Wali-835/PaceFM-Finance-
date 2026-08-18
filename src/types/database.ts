@@ -82,6 +82,15 @@ export type Client = {
   eta_building_number: string | null
 }
 
+export type EtaSubmissionStatus =
+  | 'not_submitted'
+  | 'pending_signature'
+  | 'signed'
+  | 'submitted'
+  | 'accepted'
+  | 'rejected'
+  | 'error'
+
 export type Invoice = {
   id: string
   company_id: string
@@ -94,6 +103,12 @@ export type Invoice = {
   tax_rate: number
   wht_rate: number
   created_at: string
+  eta_status: EtaSubmissionStatus
+  eta_uuid: string | null
+  eta_submission_uuid: string | null
+  eta_long_id: string | null
+  eta_error: string | null
+  eta_submitted_at: string | null
 }
 
 export type InvoiceItem = {
