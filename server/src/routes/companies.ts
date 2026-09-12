@@ -156,3 +156,128 @@ companiesRouter.get(
     res.json(members.map((m) => ({ role: m.role, user: m.user })))
   }),
 )
+
+const inviteSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['admin', 'member']),
+})
+
+companiesRouter.post(
+  '/:companyId/members',
+  requireCompanyAdmin(),
+  asyncHandler(async (req, res) => {
+    const parsed = inviteSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' })
+      return
+    }
+    const companyId = req.params.companyId
+    const email = parsed.data.email.trim().toLowerCase()
+    const { role } = parsed.data
+
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    })
+
+    if (existingUser) {
+      const alreadyMember = await prisma.companyMember.findUnique({
+        where: { companyId_userId: { companyId, userId: existingUser.id } },
+      })
+      if (alreadyMember) {
+        res.status(409).json({ error: 'This person is already a member of this company' })
+        return
+      }
+      const member = await prisma.companyMember.create({
+        data: { companyId, userId: existingUser.id, role },
+        include: { user: { select: { id: true, email: true } } },
+      })
+      res.status(201).json({ status: 'added', role: member.role, user: member.user })
+      return
+    }
+
+    const invite = await prisma.companyInvite.upsert({
+      where: { companyId_email: { companyId, email } },
+      create: { companyId, email, role, invitedBy: req.userId! },
+      update: { role },
+    })
+    res.status(201).json({ status: 'pending', id: invite.id, email: invite.email, role: invite.role })
+  }),
+)
+
+const roleSchema = z.object({ role: z.enum(['owner', 'admin', 'member']) })
+
+companiesRouter.patch(
+  '/:companyId/members/:userId',
+  requireCompanyAdmin(),
+  asyncHandler(async (req, res) => {
+    const parsed = roleSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' })
+      return
+    }
+    const { companyId, userId } = req.params
+    const target = await prisma.companyMember.findUnique({ where: { companyId_userId: { companyId, userId } } })
+    if (!target) {
+      res.status(404).json({ error: 'Member not found' })
+      return
+    }
+    if (target.role === 'owner' && parsed.data.role !== 'owner') {
+      const ownerCount = await prisma.companyMember.count({ where: { companyId, role: 'owner' } })
+      if (ownerCount <= 1) {
+        res.status(400).json({ error: 'A company must have at least one owner' })
+        return
+      }
+    }
+    const updated = await prisma.companyMember.update({
+      where: { companyId_userId: { companyId, userId } },
+      data: { role: parsed.data.role },
+      include: { user: { select: { id: true, email: true } } },
+    })
+    res.json({ role: updated.role, user: updated.user })
+  }),
+)
+
+companiesRouter.delete(
+  '/:companyId/members/:userId',
+  requireCompanyAdmin(),
+  asyncHandler(async (req, res) => {
+    const { companyId, userId } = req.params
+    const target = await prisma.companyMember.findUnique({ where: { companyId_userId: { companyId, userId } } })
+    if (!target) {
+      res.status(404).json({ error: 'Member not found' })
+      return
+    }
+    if (target.role === 'owner') {
+      const ownerCount = await prisma.companyMember.count({ where: { companyId, role: 'owner' } })
+      if (ownerCount <= 1) {
+        res.status(400).json({ error: 'A company must have at least one owner' })
+        return
+      }
+    }
+    await prisma.companyMember.delete({ where: { companyId_userId: { companyId, userId } } })
+    res.status(204).end()
+  }),
+)
+
+companiesRouter.get(
+  '/:companyId/invites',
+  requireCompanyAdmin(),
+  asyncHandler(async (req, res) => {
+    const invites = await prisma.companyInvite.findMany({
+      where: { companyId: req.params.companyId },
+      orderBy: { createdAt: 'desc' },
+    })
+    res.json(invites.map((i) => ({ id: i.id, email: i.email, role: i.role, created_at: i.createdAt.toISOString() })))
+  }),
+)
+
+companiesRouter.delete(
+  '/:companyId/invites/:inviteId',
+  requireCompanyAdmin(),
+  asyncHandler(async (req, res) => {
+    await prisma.companyInvite.delete({
+      where: { id: req.params.inviteId, companyId: req.params.companyId },
+    })
+    res.status(204).end()
+  }),
+)

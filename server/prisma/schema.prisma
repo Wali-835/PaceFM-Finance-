@@ -60,6 +60,7 @@ model User {
   memberships      CompanyMember[]
   createdCompanies Company[]       @relation("CompanyCreator")
   transactions     Transaction[]
+  sentInvites      CompanyInvite[] @relation("InviteSender")
 }
 
 model Company {
@@ -78,6 +79,7 @@ model Company {
   invoices     Invoice[]
   vendors      Vendor[]
   bills        Bill[]
+  invites      CompanyInvite[]
 
   // ETA e-invoicing issuer profile. Required on the invoice document once
   // we start submitting to ETA; optional here so existing companies aren't
@@ -100,6 +102,19 @@ model CompanyMember {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([companyId, userId])
+}
+
+model CompanyInvite {
+  id        String     @id @default(uuid())
+  companyId String
+  email     String
+  role      MemberRole @default(member)
+  invitedBy String
+  createdAt DateTime   @default(now())
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inviter   User       @relation("InviteSender", fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
 }
 
 model Account {

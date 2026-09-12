@@ -1,12 +1,21 @@
 import { useState, type FormEvent } from 'react'
-import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Plus, Trash2, UserPlus, XCircle } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 import { useCompany } from '@/context/CompanyContext'
 import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories'
 import { useAccounts, useCreateAccount } from '@/hooks/useAccounts'
+import {
+  useCancelInvite,
+  useInviteMember,
+  useInvites,
+  useMembers,
+  useRemoveMember,
+  useUpdateMemberRole,
+} from '@/hooks/useMembers'
 import { Button, Card, Input, Label, Select } from '@/components/ui'
 import { CURRENCIES } from '@/lib/currencies'
 import { api, ApiError } from '@/lib/api'
-import type { AccountType, CategoryKind } from '@/types/database'
+import type { AccountType, CategoryKind, MemberRole } from '@/types/database'
 
 type EtaTestResult =
   | { ok: true; environment: string }
@@ -60,6 +69,19 @@ export default function SettingsPage() {
 
   const [testingEta, setTestingEta] = useState(false)
   const [etaResult, setEtaResult] = useState<EtaTestResult | null>(null)
+
+  const { user } = useAuth()
+  const { data: members = [] } = useMembers()
+  const { data: invites = [] } = useInvites()
+  const inviteMember = useInviteMember()
+  const updateMemberRole = useUpdateMemberRole()
+  const removeMember = useRemoveMember()
+  const cancelInvite = useCancelInvite()
+  const myRole = members.find((m) => m.user.id === user?.id)?.role
+  const isTeamAdmin = myRole === 'owner' || myRole === 'admin'
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
+  const [inviteMessage, setInviteMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function handleProfileSave(e: FormEvent) {
     e.preventDefault()
@@ -150,6 +172,43 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleInviteMember(e: FormEvent) {
+    e.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInviteMessage(null)
+    try {
+      const result = await inviteMember.mutateAsync({ email: inviteEmail.trim(), role: inviteRole })
+      setInviteMessage(
+        result.status === 'added'
+          ? { ok: true, text: `${inviteEmail.trim()} was added to the company.` }
+          : {
+              ok: true,
+              text: `Invitation saved. ${inviteEmail.trim()} will join automatically once they sign up with that email.`,
+            },
+      )
+      setInviteEmail('')
+    } catch (err) {
+      setInviteMessage({ ok: false, text: err instanceof ApiError ? err.message : 'Something went wrong' })
+    }
+  }
+
+  async function handleRemoveMember(userId: string, email: string) {
+    if (!confirm(`Remove ${email} from this company?`)) return
+    try {
+      await removeMember.mutateAsync(userId)
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Something went wrong')
+    }
+  }
+
+  async function handleChangeRole(userId: string, role: MemberRole) {
+    try {
+      await updateMemberRole.mutateAsync({ userId, role })
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Something went wrong')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -180,6 +239,108 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">Team members</h2>
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          Everyone with access to this company's data.
+        </p>
+
+        <div className="space-y-1">
+          {members.map((m) => (
+            <div
+              key={m.user.id}
+              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <span className="text-slate-700 dark:text-slate-300">
+                {m.user.email}
+                {m.user.id === user?.id && <span className="ml-1 text-xs text-slate-400">(you)</span>}
+              </span>
+              <div className="flex items-center gap-2">
+                {isTeamAdmin ? (
+                  <Select
+                    className="!w-auto py-1 text-xs"
+                    value={m.role}
+                    onChange={(e) => handleChangeRole(m.user.id, e.target.value as MemberRole)}
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="admin">Admin</option>
+                    <option value="member">Member</option>
+                  </Select>
+                ) : (
+                  <span className="text-xs uppercase text-slate-400">{m.role}</span>
+                )}
+                {isTeamAdmin && (
+                  <button
+                    onClick={() => handleRemoveMember(m.user.id, m.user.email)}
+                    className="text-slate-400 hover:text-negative-500"
+                    aria-label={`Remove ${m.user.email}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {isTeamAdmin && invites.length > 0 && (
+          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="mb-2 text-xs font-medium uppercase text-slate-400">Pending invites</p>
+            <div className="space-y-1">
+              {invites.map((i) => (
+                <div
+                  key={i.id}
+                  className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {i.email}
+                    <span className="ml-2 text-xs uppercase text-slate-400">{i.role}</span>
+                  </span>
+                  <button
+                    onClick={() => cancelInvite.mutate(i.id)}
+                    className="text-slate-400 hover:text-negative-500"
+                    aria-label={`Cancel invite for ${i.email}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isTeamAdmin && (
+          <form onSubmit={handleInviteMember} className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div className="flex-1">
+              <Label htmlFor="invite_email">Invite by email</Label>
+              <Input
+                id="invite_email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="teammate@example.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="invite_role">Role</Label>
+              <Select id="invite_role" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}>
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </div>
+            <Button type="submit" disabled={inviteMember.isPending}>
+              <UserPlus size={16} /> Invite
+            </Button>
+          </form>
+        )}
+
+        {inviteMessage && (
+          <p className={`mt-3 text-sm ${inviteMessage.ok ? 'text-positive-600 dark:text-positive-500' : 'text-negative-600 dark:text-negative-500'}`}>
+            {inviteMessage.text}
+          </p>
+        )}
       </Card>
 
       <Card>

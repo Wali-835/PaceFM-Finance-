@@ -47,7 +47,22 @@ authRouter.post(
     }
 
     const passwordHash = await hashPassword(password)
-    const user = await prisma.user.create({ data: { email, passwordHash } })
+
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { email, passwordHash } })
+
+      const pendingInvites = await tx.companyInvite.findMany({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      })
+      for (const invite of pendingInvites) {
+        await tx.companyMember.create({
+          data: { companyId: invite.companyId, userId: created.id, role: invite.role },
+        })
+        await tx.companyInvite.delete({ where: { id: invite.id } })
+      }
+
+      return created
+    })
 
     const token = signToken(user.id)
     res.cookie(AUTH_COOKIE_NAME, token, cookieOptions)
